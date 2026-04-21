@@ -1,12 +1,14 @@
 """Programme principal du jeu Space Devastator Solo"""
 
-import sys
 import os
+import sys
+
 import pygame
 
 from config import Configuration
-from etats import EtatJeu
+from etats import EtatJeu, DirectionHorizontale
 from objets import Joueur, Adversaire
+
 
 class Jeu:
     """Classe principale du jeu."""
@@ -22,14 +24,14 @@ class Jeu:
         # ou non. Utile pour le déboguage.
         mode_fenetre = os.environ.get("MODE_FENETRE") == "1"
 
-        flags_fenetre = pygame.SCALED
-        if not mode_fenetre:
-            flags_fenetre |= pygame.FULLSCREEN
-
-        self.fenetre = pygame.display.set_mode(
-            (self.config.largeur_fenetre, self.config.hauteur_fenetre),
-            flags_fenetre,
+        self.surface_jeu = pygame.Surface(
+            (self.config.largeur_fenetre, self.config.hauteur_fenetre)
         )
+        self.surface_affichage, self.zone_affichage = (
+            self._creer_surface_affichage(mode_fenetre)
+        )
+
+        pygame.display.set_caption(self.config.titre)
 
         self.horloge = pygame.time.Clock()
         self.etat = EtatJeu.PREPARATION
@@ -38,6 +40,29 @@ class Jeu:
         self.adversaires = self._creer_grille_adversaires()
 
         self.police_base = pygame.font.Font(None, self.config.taille_police_base)
+
+        self.etat = EtatJeu.EXECUTION
+
+    def _creer_surface_affichage(
+        self,
+        mode_fenetre: bool,
+    ) -> tuple[pygame.Surface, pygame.Rect]:
+        """Crée la surface réelle d'affichage et la zone de rendu du jeu."""
+
+        taille_jeu = (
+            self.config.largeur_fenetre,
+            self.config.hauteur_fenetre,
+        )
+
+        if mode_fenetre:
+            surface_affichage = pygame.display.set_mode(taille_jeu)
+            zone_affichage = surface_affichage.get_rect()
+            return surface_affichage, zone_affichage
+
+        surface_affichage = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
+        zone_affichage = pygame.Rect((0, 0), taille_jeu)
+        zone_affichage.center = surface_affichage.get_rect().center
+        return surface_affichage, zone_affichage
 
     def _creer_grille_adversaires(self) -> list[Adversaire]:
         """Crée une grille avec tous les adversaires."""
@@ -77,18 +102,32 @@ class Jeu:
 
     def _mettre_a_jour(self) -> None:
         """Met à jour la logique du jeu."""
-        pass
+        
+        if self.etat is not EtatJeu.EXECUTION:
+            return
+
+        touches = pygame.key.get_pressed()
+        direction = DirectionHorizontale.IMMOBILE
+
+        if touches[pygame.K_LEFT]:
+            direction = DirectionHorizontale.GAUCHE
+
+        if touches[pygame.K_RIGHT]:
+            direction = DirectionHorizontale.DROITE
+
+        self.joueur.deplacer(direction, self.config)
 
     def _dessiner(self) -> None:
         """Dessine la scène complète."""
 
-        self.fenetre.fill(self.config.couleur_fond)
+        self.surface_jeu.fill(self.config.couleur_fond)
 
         for adv in self.adversaires:
-            adv.dessiner(self.fenetre, self.config)
+            adv.dessiner(self.surface_jeu, self.config)
 
-        self.joueur.dessiner(self.fenetre, self.config)
+        self.joueur.dessiner(self.surface_jeu, self.config)
         self._dessiner_etat()
+        self._presenter_image()
 
         pygame.display.flip()
 
@@ -101,7 +140,22 @@ class Jeu:
             True,
             self.config.couleur_texte,
         )
-        self.fenetre.blit(image_texte, (20, 20))
+        self.surface_jeu.blit(image_texte, (20, 20))
+
+    def _presenter_image(self) -> None:
+        """Affiche l'image du jeu sans étirement, avec bords noirs si besoin."""
+
+        self.surface_affichage.fill((0, 0, 0))
+
+        if self.zone_affichage.size == self.surface_jeu.get_size():
+            self.surface_affichage.blit(self.surface_jeu, self.zone_affichage)
+            return
+
+        image_redimensionnee = pygame.transform.scale(
+            self.surface_jeu,
+            self.zone_affichage.size,
+        )
+        self.surface_affichage.blit(image_redimensionnee, self.zone_affichage)
 
     def executer(self) -> None:
         """Lance la boucle principale du jeu."""

@@ -1,6 +1,6 @@
 """États principaux du jeu."""
 
-from enum import Enum, auto
+from enum import Enum, IntEnum, auto
 
 
 class EtatJeu(Enum):
@@ -11,3 +11,11 @@ class EtatJeu(Enum):
     FERMETURE = auto()
     VICTOIRE = auto()
     DEFAITE = auto()
+
+
+class DirectionHorizontale(IntEnum):
+    """Représente une direction sur l'axe horizontal"""
+
+    GAUCHE = -1
+    IMMOBILE = 0
+    DROITE = 1

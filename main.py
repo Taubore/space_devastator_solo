@@ -1,6 +1,7 @@
 """Programme principal du jeu Space Devastator Solo"""
 
 import sys
+import os
 import pygame
 
 from config import Configuration
@@ -16,10 +17,20 @@ class Jeu:
         pygame.init()
 
         self.config = Configuration()
+
+        # Récupération du paramètre dans launch.json pour afficher en mode fenêtré
+        # ou non. Utile pour le déboguage.
+        mode_fenetre = os.environ.get("MODE_FENETRE") == "1"
+
+        flags_fenetre = pygame.SCALED
+        if not mode_fenetre:
+            flags_fenetre |= pygame.FULLSCREEN
+
         self.fenetre = pygame.display.set_mode(
             (self.config.largeur_fenetre, self.config.hauteur_fenetre),
-            pygame.FULLSCREEN | pygame.SCALED,
+            flags_fenetre,
         )
+
         self.horloge = pygame.time.Clock()
         self.etat = EtatJeu.PREPARATION
 

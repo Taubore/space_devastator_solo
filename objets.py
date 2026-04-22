@@ -8,8 +8,8 @@ class Joueur:
     """Vaisseau contrôlé par le joueur."""
 
     def __init__(self, config: Configuration) -> None:
-        x = (config.largeur_zone_jouable - config.largeur_joueur) // 2
-        y = (config.hauteur_zone_jouable - config.hauteur_joueur)
+        x = (config.limite_x_max_zone_jouable - config.largeur_joueur) // 2
+        y = (config.limite_y_max_zone_jouable - config.hauteur_joueur)
 
         self.rect = pygame.Rect(
             x,
@@ -35,11 +35,11 @@ class Joueur:
         
         self.rect.x += direction * config.vitesse_joueur
 
-        if self.rect.left < config.marge_x_zone_jouable:
-            self.rect.left = config.marge_x_zone_jouable 
+        if self.rect.left < config.limite_x_min_zone_jouable:
+            self.rect.left = config.limite_x_min_zone_jouable 
         
-        if self.rect.right > config.largeur_zone_jouable:
-            self.rect.right = config.largeur_zone_jouable
+        if self.rect.right > config.limite_x_max_zone_jouable:
+            self.rect.right = config.limite_x_max_zone_jouable
 
 class Adversaire:
     """Adversaire individuel dans la grille."""
@@ -64,17 +64,53 @@ class Adversaire:
 class FormationAdversaires:
     """Gère le déplacement collectif des adversaires."""
 
-    def __init__(self, adversaires: list[Adversaire]) -> None:
-        self.adversaires = adversaires
+    def __init__(self) -> None:
+        self.adversaires = []
         self.direction = DirectionHorizontale.DROITE
 
     @property
     def nombre_adversaires(self) -> int:
         """Retourne le nombre d'adversaires encore présents."""
+        
         return len(self.adversaires)
+
+    def creer_adversaires(self, config: Configuration) -> None:
+        """
+        Initialise tous les adversaires à partir des infos de la configuration.
+        """
+
+        self.adversaires = []
+
+        pas_x = (
+            config.largeur_adversaire
+            + config.espacement_adversaire_x
+        )
+        pas_y = (
+            config.hauteur_adversaire
+            + config.espacement_adversaire_y
+        )
+
+        for lig in range(config.lignes_adversaires):
+            for col in range(config.colonnes_adversaires):
+                x = config.depart_adversaire_grille_x + col * pas_x
+                y = config.depart_adversaire_grille_y + lig * pas_y
+                self.adversaires.append(Adversaire(x, y, config))
+
+    def traiter_collision_projectile(self, projectile_rect: pygame.Rect) -> bool:
+        """
+        Vérifie si projectile touche un adversaire.
+        Retire l'adversaire touché et retourne True, sinon False.
+        """
+        for adv in self.adversaires:
+            if projectile_rect.colliderect(adv.rect):
+                self.adversaires.remove(adv)
+                return True
+
+        return False
 
     def mettre_a_jour(self, config: Configuration) -> None:
         """Déplace la formation et la fait descendre lorsqu'elle touche un bord."""
+        
         if not self.adversaires:
             return
 
@@ -84,10 +120,10 @@ class FormationAdversaires:
         bord_droit = max(adv.rect.right for adv in self.adversaires)
 
         touche_bord_gauche = (
-            bord_gauche + decalage_x <= config.marge_x_zone_jouable
+            bord_gauche + decalage_x <= config.limite_x_min_zone_jouable
         )
         touche_bord_droit = (
-            bord_droit + decalage_x >= config.largeur_zone_jouable
+            bord_droit + decalage_x >= config.limite_x_max_zone_jouable
         )
 
         if touche_bord_gauche or touche_bord_droit:
@@ -123,11 +159,12 @@ class ProjectileJoueur:
         )
         self.rect.centerx = x_centre
         self.rect.bottom = y_haut
-
+        self.limite_projectile_haut = config.limite_y_min_zone_jouable
+        
     @property
     def est_sorti(self) -> bool:
         """Indique si le projectile est sorti par le haut de l'écran."""
-        return self.rect.bottom < 0
+        return self.rect.bottom < self.limite_projectile_haut
 
     def mettre_a_jour(self, config: Configuration) -> None:
         """Déplace le projectile vers le haut."""

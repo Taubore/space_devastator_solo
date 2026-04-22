@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 
 
-@dataclass(frozen=True)
+@dataclass
 class Configuration:
     """Regroupe les paramètres stables du jeu."""
 
@@ -11,14 +11,16 @@ class Configuration:
     hauteur_fenetre: int = 800
     images_par_seconde: int = 60
 
-    marge_x_zone_jouable: int = 50
-    marge_y_zone_jouable: int = 50
-    largeur_zone_jouable: int = largeur_fenetre - marge_x_zone_jouable
-    hauteur_zone_jouable: int = hauteur_fenetre - marge_y_zone_jouable
+    limite_x_min_zone_jouable: int = 50
+    limite_y_min_zone_jouable: int = 50
+    limite_x_max_zone_jouable: int = largeur_fenetre - limite_x_min_zone_jouable
+    limite_y_max_zone_jouable: int = hauteur_fenetre - limite_y_min_zone_jouable
 
     titre: str = "Space Devastator solo"
-    taille_police_base: int = 16
-
+    taille_police_titre: int = 68
+    taille_police_texte: int = 32
+    taille_police_base: int = 18
+    
     couleur_fond: tuple[int, int, int] = (8, 10, 20)
     couleur_texte: tuple[int, int, int] = (230, 230, 230)
 
@@ -28,6 +30,7 @@ class Configuration:
     largeur_joueur: int = 96
     hauteur_joueur: int = 96
     vitesse_joueur: int = 7
+    ligne_defaite: int = limite_y_max_zone_jouable - hauteur_joueur - 25
 
     # Adversaires
     couleur_adversaire: tuple[int, int, int] = (120, 255, 120) # À retirer 
@@ -36,16 +39,17 @@ class Configuration:
     hauteur_adversaire: int = 64
     vitesse_formation_adversaires: int = 1
     descente_formation_adversaires: int = 16
+    increment_vitesse_formation_adversaires: int = 1
     colonnes_adversaires: int = 8
     lignes_adversaires: int = 3
     espacement_adversaire_x: int = 54
     espacement_adversaire_y: int = 40
     depart_adversaire_grille_x: int = 208
-    depart_adversaire_grille_y: int = marge_y_zone_jouable
+    depart_adversaire_grille_y: int = limite_y_min_zone_jouable
 
     # Projectile
     couleur_projectile_joueur: tuple[int, int, int] = (120, 220, 255)  # À retirer
 
-    largeur_projectile_joueur: int = 12
+    largeur_projectile_joueur: int = 8
     hauteur_projectile_joueur: int = 32
-    vitesse_projectile_joueur: int = 10
+    vitesse_projectile_joueur: int = 15

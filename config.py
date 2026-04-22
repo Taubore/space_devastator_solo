@@ -22,16 +22,20 @@ class Configuration:
     couleur_fond: tuple[int, int, int] = (8, 10, 20)
     couleur_texte: tuple[int, int, int] = (230, 230, 230)
 
-    # À retirer lorsque sprites seront créés
-    couleur_joueur: tuple[int, int, int] = (80, 220, 255)
-    couleur_adversaire: tuple[int, int, int] = (120, 255, 120)
+    # Joueur
+    couleur_joueur: tuple[int, int, int] = (80, 220, 255)  # À retirer lorsque sprite
 
     largeur_joueur: int = 96
     hauteur_joueur: int = 96
+    vitesse_joueur: int = 7
 
+    # Adversaires
+    couleur_adversaire: tuple[int, int, int] = (120, 255, 120) # À retirer 
+    
     largeur_adversaire: int = 64
     hauteur_adversaire: int = 64
-
+    vitesse_formation_adversaires: int = 1
+    descente_formation_adversaires: int = 16
     colonnes_adversaires: int = 8
     lignes_adversaires: int = 3
     espacement_adversaire_x: int = 54
@@ -39,4 +43,9 @@ class Configuration:
     depart_adversaire_grille_x: int = 208
     depart_adversaire_grille_y: int = marge_y_zone_jouable
 
-    vitesse_joueur: int = 7
+    # Projectile
+    couleur_projectile_joueur: tuple[int, int, int] = (120, 220, 255)  # À retirer
+
+    largeur_projectile_joueur: int = 12
+    hauteur_projectile_joueur: int = 32
+    vitesse_projectile_joueur: int = 10

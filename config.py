@@ -1,9 +1,11 @@
-"""Configuration du jeu."""
+""" 
+Configuration du jeu.
+"""
 
 from dataclasses import dataclass
 
 
-@dataclass
+@dataclass(frozen=True)
 class Configuration:
     """Regroupe les paramètres stables du jeu."""
 
@@ -27,6 +29,7 @@ class Configuration:
     image_fond_ecran: str = "assets/images/fond_ecran.png"
 
     duree_clignotement_defaut_ms: int = 500
+    nb_vies = 3
 
     # Joueur
     couleur_joueur: tuple[int, int, int] = (80, 220, 255)  # À retirer lorsque sprite
@@ -43,7 +46,7 @@ class Configuration:
     
     largeur_adversaire: int = 64
     hauteur_adversaire: int = 64
-    vitesse_formation_adversaires: int = 1
+    vitesse_initiale_formation_adversaires: int = 1
     descente_formation_adversaires: int = 16
     increment_vitesse_formation_adversaires: int = 1
     colonnes_adversaires: int = 8

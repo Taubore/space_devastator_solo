@@ -1,4 +1,6 @@
-"""Programme principal du jeu Space Devastator Solo"""
+"""
+Programme principal du jeu Space Devastator Solo
+"""
 
 import os
 import sys
@@ -7,8 +9,8 @@ import pygame
 
 from config import Configuration
 from etats import EtatJeu, DirectionHorizontale
+from commun import Clignotement
 from objets import (
-    Clignotement,
     Joueur,
     Adversaire,
     FormationAdversaires,
@@ -48,7 +50,7 @@ class Jeu:
         self.etat = EtatJeu.PREPARATION
 
         self.joueur = Joueur(self.config)
-        self.formation_adversaires = FormationAdversaires()
+        self.formation_adversaires = FormationAdversaires(self.config)
 
         self.projectile_joueur: ProjectileJoueur | None = None
         self.clignotement_defaut = Clignotement(
@@ -70,16 +72,14 @@ class Jeu:
             (self.config.largeur_fenetre, self.config.hauteur_fenetre),
         )
 
-    def _initialiser_session(self) -> None:
+    def _initialiser_partie(self) -> None:
         """
-        Initialise une nouvelle session en début de partie ou après avoir éliminé
-        tous les adversaires.
+        Initialise une nouvelle partie
         """
 
-        self.touche_tir_precedente = False
-        self.defaite_imminente = False 
-        self.clignotement_defaut.reinitialiser()
-        self.formation_adversaires.creer_adversaires(self.config)
+        self.nombre_vies = self.config.nb_vies
+        self.pointage = 0
+        self.vitesse_formation_adversaires = self.config.vitesse_initiale_formation_adversaires
 
         # Faux rectangle (en fait c'est une ligne) qui délimite la zone où si un 
         # adversaire s'invite, le joueur perd la partie
@@ -99,10 +99,20 @@ class Jeu:
             1,
         )
 
-    def _creer_surface_affichage(
-        self,
-        mode_fenetre: bool,
-    ) -> tuple[pygame.Surface, pygame.Rect]:
+    def _initialiser_session(self) -> None:
+        """
+        Initialise une nouvelle session en début de partie ou après avoir éliminé
+        tous les adversaires.
+        """
+
+        self.touche_tir_precedente = False
+        self.defaite_imminente = False 
+
+        self.clignotement_defaut.reinitialiser()
+        self.formation_adversaires.creer_adversaires(self.vitesse_formation_adversaires)
+
+
+    def _creer_surface_affichage(self, mode_fenetre: bool) -> tuple[pygame.Surface, pygame.Rect]:
         """
         Crée la surface réelle d'affichage et la zone de rendu du jeu.
         """
@@ -160,8 +170,8 @@ class Jeu:
             direction = DirectionHorizontale.DROITE
 
         # Gestion des déplacements
-        self.joueur.deplacer(direction, self.config)
-        self.formation_adversaires.mettre_a_jour(self.config)
+        self.joueur.deplacer(direction)
+        self.formation_adversaires.mettre_a_jour()
 
         # Gestion du bouton de tir
         touche_tir = touches[pygame.K_a]
@@ -171,7 +181,7 @@ class Jeu:
 
         # Gestion du projectile
         if self.projectile_joueur is not None:
-            self.projectile_joueur.mettre_a_jour(self.config)
+            self.projectile_joueur.mettre_a_jour()
             self._gerer_collision_projectile_adversaires()
             if self.projectile_joueur is not None and self.projectile_joueur.est_sorti:
                 self.projectile_joueur = None
@@ -180,7 +190,7 @@ class Jeu:
         if self.etat == EtatJeu.EXECUTION:
             if self.formation_adversaires.nombre_adversaires == 0:
                 self.etat = EtatJeu.VICTOIRE
-                self.config.vitesse_formation_adversaires += \
+                self.vitesse_formation_adversaires += \
                     self.config.increment_vitesse_formation_adversaires
             if self.formation_adversaires.verifier_collision(self.rect_defaite) is not None:
                 self.etat = EtatJeu.DEFAITE
@@ -199,9 +209,9 @@ class Jeu:
         self.surface_jeu.blit(self.image_fond, (0, 0))
         temps_actuel = pygame.time.get_ticks()
 
-        self.formation_adversaires.dessiner(self.surface_jeu, self.config) 
+        self.formation_adversaires.dessiner(self.surface_jeu) 
 
-        self.joueur.dessiner(self.surface_jeu, self.config)
+        self.joueur.dessiner(self.surface_jeu)
 
         # Dessiner l'axe de défaite, il restera affiché jusqu'à une défaite ou victoire.
         if (
@@ -216,7 +226,7 @@ class Jeu:
             )
 
         if self.projectile_joueur is not None:
-            self.projectile_joueur.dessiner(self.surface_jeu, self.config)
+            self.projectile_joueur.dessiner(self.surface_jeu)
 
         if self.etat is EtatJeu.PREPARATION:
             self._dessiner_ecran_demarrage()
@@ -333,27 +343,6 @@ class Jeu:
         self.surface_jeu.blit(image_victoire, rect_titre)
         self.surface_jeu.blit(image_instruction, rect_instruction)
 
-    def _dessiner_axe_y_defaite_joueur(self) -> None:
-        """
-        Trace une ligne repère au-dessus du joueur.
-        """
-
-        # Créer une fausse ligne avec un objet Rect pour faciliter plus tard
-        # les collisions
-        ligne_rect = pygame.Rect (
-            self.config.limite_x_min_zone_jouable,
-            self.config.axe_y_defaite,
-            self.config.limite_x_max_zone_jouable - \
-                self.config.limite_x_min_zone_jouable,
-            1,
-        )
-
-        pygame.draw.rect(
-            self.surface_jeu,
-            self.config.couleur_axe_defaite,
-            self.rect_defaite,
-        )
-
     def _presenter_image(self) -> None:
         """
         Affiche l'image du jeu sans étirement, avec bords noirs si besoin.
@@ -402,6 +391,8 @@ class Jeu:
         """
         Lance la boucle principale du jeu.
         """
+
+        self._initialiser_partie()
 
         while self.etat is not EtatJeu.FERMETURE:
             self._traiter_evenements()

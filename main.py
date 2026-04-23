@@ -7,7 +7,13 @@ import pygame
 
 from config import Configuration
 from etats import EtatJeu, DirectionHorizontale
-from objets import Joueur, Adversaire, FormationAdversaires, ProjectileJoueur
+from objets import (
+    Clignotement,
+    Joueur,
+    Adversaire,
+    FormationAdversaires,
+    ProjectileJoueur,
+)
 
 
 class Jeu:
@@ -34,6 +40,7 @@ class Jeu:
         self.surface_affichage, self.zone_affichage = (
             self._creer_surface_affichage(mode_fenetre)
         )
+        self.image_fond = self._charger_image_fond()
 
         pygame.display.set_caption(self.config.titre)
 
@@ -44,10 +51,24 @@ class Jeu:
         self.formation_adversaires = FormationAdversaires()
 
         self.projectile_joueur: ProjectileJoueur | None = None
+        self.clignotement_defaut = Clignotement(
+            self.config.duree_clignotement_defaut_ms
+        )
         
         self.police_titre = pygame.font.Font(None, self.config.taille_police_titre)
         self.police_texte = pygame.font.Font(None, self.config.taille_police_texte)
         self.police_base = pygame.font.Font(None, self.config.taille_police_base)
+
+    def _charger_image_fond(self) -> pygame.Surface:
+        """
+        Charge l'image de fond et l'adapte à la surface logique du jeu.
+        """
+
+        image_fond = pygame.image.load(self.config.image_fond_ecran).convert()
+        return pygame.transform.smoothscale(
+            image_fond,
+            (self.config.largeur_fenetre, self.config.hauteur_fenetre),
+        )
 
     def _initialiser_session(self) -> None:
         """
@@ -56,8 +77,27 @@ class Jeu:
         """
 
         self.touche_tir_precedente = False
+        self.defaite_imminente = False 
+        self.clignotement_defaut.reinitialiser()
         self.formation_adversaires.creer_adversaires(self.config)
 
+        # Faux rectangle (en fait c'est une ligne) qui délimite la zone où si un 
+        # adversaire s'invite, le joueur perd la partie
+        self.rect_defaite = pygame.Rect (
+            self.config.limite_x_min_zone_jouable,
+            self.config.axe_y_defaite,
+            self.config.limite_x_max_zone_jouable - \
+                self.config.limite_x_min_zone_jouable,
+            1,
+        )
+
+        self.rect_defaite_proche = pygame.Rect(
+            self.config.limite_x_min_zone_jouable,
+            self.config.axe_y_avertissement,
+            self.config.limite_x_max_zone_jouable - \
+                self.config.limite_x_min_zone_jouable,
+            1,
+        )
 
     def _creer_surface_affichage(
         self,
@@ -142,18 +182,38 @@ class Jeu:
                 self.etat = EtatJeu.VICTOIRE
                 self.config.vitesse_formation_adversaires += \
                     self.config.increment_vitesse_formation_adversaires
+            if self.formation_adversaires.verifier_collision(self.rect_defaite) is not None:
+                self.etat = EtatJeu.DEFAITE
+
+        # Vérification si la déftaire est proche
+        if (self.etat is EtatJeu.EXECUTION
+            and self.formation_adversaires.verifier_collision(self.rect_defaite_proche)
+        ):
+            self.defaite_imminente = True
 
     def _dessiner(self) -> None:
         """
         Dessine la scène complète.
         """
 
-        self.surface_jeu.fill(self.config.couleur_fond)
+        self.surface_jeu.blit(self.image_fond, (0, 0))
+        temps_actuel = pygame.time.get_ticks()
 
         self.formation_adversaires.dessiner(self.surface_jeu, self.config) 
 
         self.joueur.dessiner(self.surface_jeu, self.config)
-        self._dessiner_ligne_repere_joueur()
+
+        # Dessiner l'axe de défaite, il restera affiché jusqu'à une défaite ou victoire.
+        if (
+            self.etat is EtatJeu.EXECUTION
+            and self.defaite_imminente
+            and self.clignotement_defaut.est_visible(temps_actuel)
+        ):
+            pygame.draw.rect(
+                self.surface_jeu,
+                self.config.couleur_axe_defaite,
+                self.rect_defaite,
+            )
 
         if self.projectile_joueur is not None:
             self.projectile_joueur.dessiner(self.surface_jeu, self.config)
@@ -163,6 +223,9 @@ class Jeu:
 
         if self.etat is EtatJeu.VICTOIRE:
             self._dessiner_ecran_victoire()
+
+        if self.etat is EtatJeu.DEFAITE:
+            self._dessiner_ecran_defaite()
 
         self._dessiner_etat()
         self._presenter_image()
@@ -241,17 +304,54 @@ class Jeu:
         self.surface_jeu.blit(image_victoire, rect_titre)
         self.surface_jeu.blit(image_instruction, rect_instruction)
 
-    def _dessiner_ligne_repere_joueur(self) -> None:
+    def _dessiner_ecran_defaite(self) -> None:
+        """
+        Affiche un message comme quoi le joueur s'est fait envahir, qu'il a perdu.
+        """
+
+        image_victoire = self.police_titre.render(
+            "Vous avez été envahit par les extraterrestres!",
+            True,
+            self.config.couleur_texte,
+        )
+        image_instruction = self.police_texte.render(
+            "Appuyez ESPACE pour poursuivre.",
+            True,
+            self.config.couleur_texte,
+        )
+
+        rect_titre = image_victoire.get_rect(
+            center=(
+                self.surface_jeu.get_width() // 2,
+                self.surface_jeu.get_height() // 3
+            )
+        )
+        rect_instruction = image_instruction.get_rect(
+            midtop=(rect_titre.centerx, rect_titre.bottom + 24)
+        )
+
+        self.surface_jeu.blit(image_victoire, rect_titre)
+        self.surface_jeu.blit(image_instruction, rect_instruction)
+
+    def _dessiner_axe_y_defaite_joueur(self) -> None:
         """
         Trace une ligne repère au-dessus du joueur.
         """
 
-        pygame.draw.line(
-            self.surface_jeu,
-            (120, 0, 0),
-            (self.config.limite_x_min_zone_jouable, self.config.ligne_defaite),
-            (self.config.limite_x_max_zone_jouable, self.config.ligne_defaite),
+        # Créer une fausse ligne avec un objet Rect pour faciliter plus tard
+        # les collisions
+        ligne_rect = pygame.Rect (
+            self.config.limite_x_min_zone_jouable,
+            self.config.axe_y_defaite,
+            self.config.limite_x_max_zone_jouable - \
+                self.config.limite_x_min_zone_jouable,
             1,
+        )
+
+        pygame.draw.rect(
+            self.surface_jeu,
+            self.config.couleur_axe_defaite,
+            self.rect_defaite,
         )
 
     def _presenter_image(self) -> None:
@@ -293,11 +393,9 @@ class Jeu:
         if self.projectile_joueur is None:
             return
 
-        adversaire_touche = self.formation_adversaires.traiter_collision_projectile(
-            self.projectile_joueur.rect
-        )
-
-        if adversaire_touche:
+        adv = self.formation_adversaires.verifier_collision(self.projectile_joueur.rect)
+        if adv is not None:
+            self.formation_adversaires.adversaires.remove(adv)
             self.projectile_joueur = None
 
     def executer(self) -> None:

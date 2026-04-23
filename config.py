@@ -11,8 +11,8 @@ class Configuration:
     hauteur_fenetre: int = 800
     images_par_seconde: int = 60
 
-    limite_x_min_zone_jouable: int = 50
-    limite_y_min_zone_jouable: int = 50
+    limite_x_min_zone_jouable: int = 30
+    limite_y_min_zone_jouable: int = 30
     limite_x_max_zone_jouable: int = largeur_fenetre - limite_x_min_zone_jouable
     limite_y_max_zone_jouable: int = hauteur_fenetre - limite_y_min_zone_jouable
 
@@ -23,6 +23,10 @@ class Configuration:
     
     couleur_fond: tuple[int, int, int] = (8, 10, 20)
     couleur_texte: tuple[int, int, int] = (230, 230, 230)
+    couleur_axe_defaite : tuple[int, int, int] = (120, 0, 0)
+    image_fond_ecran: str = "assets/images/fond_ecran.png"
+
+    duree_clignotement_defaut_ms: int = 500
 
     # Joueur
     couleur_joueur: tuple[int, int, int] = (80, 220, 255)  # À retirer lorsque sprite
@@ -30,7 +34,9 @@ class Configuration:
     largeur_joueur: int = 96
     hauteur_joueur: int = 96
     vitesse_joueur: int = 7
-    ligne_defaite: int = limite_y_max_zone_jouable - hauteur_joueur - 25
+
+    axe_y_defaite: int = limite_y_max_zone_jouable - hauteur_joueur - 25
+    axe_y_avertissement : int = axe_y_defaite - 100
 
     # Adversaires
     couleur_adversaire: tuple[int, int, int] = (120, 255, 120) # À retirer 

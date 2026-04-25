@@ -11,6 +11,7 @@ class EtatJeu(Enum):
     FERMETURE = auto()
     VICTOIRE = auto()
     DEFAITE = auto()
+    TOUCHE = auto()
 
 
 class DirectionHorizontale(IntEnum):

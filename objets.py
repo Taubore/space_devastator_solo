@@ -50,6 +50,13 @@ class Joueur:
         if self.rect.right > self.config.limite_x_max_zone_jouable:
             self.rect.right = self.config.limite_x_max_zone_jouable
 
+    def verifier_collision(self, rect: pygame.Rect) -> bool:
+        """
+        Vérfie s'il y a collision avec le rectangle passé en paramètre.
+        """
+        
+        return rect.colliderect(self.rect)
+
 
 class Adversaire:
     """Adversaire individuel dans la grille."""
@@ -98,6 +105,7 @@ class FormationAdversaires:
         """
 
         self.vitesse_formation = vitesse
+        self.direction = DirectionHorizontale.DROITE
         self.adversaires = []
 
         pas_x = (
@@ -126,6 +134,21 @@ class FormationAdversaires:
                 return adv
 
         return None
+
+    def trouver_tireurs_valides(self) -> list[Adversaire]:
+        """
+        Retourne les adversaires qui sont en première ligne dans leur colonne.
+        """
+
+        tireurs_par_colonne: dict[int, Adversaire] = {}
+
+        for adv in self.adversaires:
+            tireur_courant = tireurs_par_colonne.get(adv.rect.x)
+
+            if tireur_courant is None or adv.rect.bottom > tireur_courant.rect.bottom:
+                tireurs_par_colonne[adv.rect.x] = adv
+
+        return list(tireurs_par_colonne.values())
 
     def mettre_a_jour(self) -> None:
         """
@@ -211,4 +234,50 @@ class ProjectileJoueur:
             self.config.couleur_projectile_joueur,
             self.rect,
             border_radius=4,
+        )
+
+class ProjectileAdversaire:
+    """Projectile tiré par les Adversaires vers le bas."""
+
+    def __init__(self, adv: Adversaire, config: Configuration) -> None:
+        """
+        Constructeur
+        """
+
+        self.config = config
+        self.rect = pygame.Rect(
+            0,
+            0,
+            config.largeur_projectile_adversaire,
+            config.hauteur_projectile_adversaire,
+        )
+        self.rect.centerx = adv.rect.centerx
+        self.rect.bottom = adv.rect.bottom
+        self.limite_projectile_bas = config.limite_y_max_zone_jouable
+        
+    @property
+    def est_sorti(self) -> bool:
+        """
+        Indique si le projectile est sorti par le bas de l'écran.
+        """
+        
+        return self.rect.top > self.limite_projectile_bas
+
+    def mettre_a_jour(self) -> None:
+        """
+        Déplace le projectile vers le bas.
+        """
+        
+        self.rect.y += self.config.vitesse_projectile_adversaire
+
+    def dessiner(self, surface: pygame.Surface) -> None:
+        """
+        Dessine temporairement le projectile sous forme de rectangle.
+        """
+        
+        pygame.draw.rect(
+            surface,
+            self.config.couleur_projectile_adversaire,
+            self.rect,
+            border_radius=1,
         )

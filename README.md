@@ -33,7 +33,9 @@ Depuis VSCode :
   sont affichés autour si la résolution réelle est plus grande
 - Ce contournement remplace `pygame.SCALED`, qui dégradait le rendu du texte et
   de l'image sur cette configuration
-- Les affichages temporaires peuvent utiliser l'utilitaire `Clignotement`
+- Les délais simples du jeu peuvent utiliser l'utilitaire `Minuteur`
   basé sur `pygame.time.get_ticks()`
+- `Clignotement` reste disponible comme surcouche spécialisée pour les
+  affichages visibles / cachés
 - La durée par défaut `duree_clignotement_defaut_ms = 500` correspond à
   `500 ms` visible puis `500 ms` masqué

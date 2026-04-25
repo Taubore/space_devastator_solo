@@ -29,7 +29,7 @@ class Configuration:
     image_fond_ecran: str = "assets/images/fond_ecran.png"
 
     duree_clignotement_defaut_ms: int = 500
-    nb_vies = 3
+    nb_vies_initiales: int = 3
 
     # Joueur
     couleur_joueur: tuple[int, int, int] = (80, 220, 255)  # À retirer lorsque sprite
@@ -56,9 +56,20 @@ class Configuration:
     depart_adversaire_grille_x: int = 208
     depart_adversaire_grille_y: int = limite_y_min_zone_jouable
 
-    # Projectile
-    couleur_projectile_joueur: tuple[int, int, int] = (120, 220, 255)  # À retirer
+    # Projectile joueur
+    couleur_projectile_joueur: tuple[int, int, int] = (255, 127, 0)  # À retirer
 
-    largeur_projectile_joueur: int = 8
+    largeur_projectile_joueur: int = 6
     hauteur_projectile_joueur: int = 32
-    vitesse_projectile_joueur: int = 15
+    vitesse_projectile_joueur: int = 14
+
+    # Projectile adversaires
+    couleur_projectile_adversaire: tuple[int, int, int] = (255, 0, 0)  # À retirer
+
+    largeur_projectile_adversaire: int = 3
+    hauteur_projectile_adversaire: int = 18
+    vitesse_projectile_adversaire: int = 6
+
+    delai_tir_adversaires_initial: int = 5500
+    increment_delai_tir_adversaires: int = -500
+

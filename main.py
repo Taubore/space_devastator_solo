@@ -4,17 +4,20 @@ Programme principal du jeu Space Devastator Solo
 
 import os
 import sys
+import random
 
 import pygame
 
+
 from config import Configuration
 from etats import EtatJeu, DirectionHorizontale
-from commun import Clignotement
+from commun import Minuteur, Clignotement
 from objets import (
     Joueur,
     Adversaire,
     FormationAdversaires,
     ProjectileJoueur,
+    ProjectileAdversaire,
 )
 
 
@@ -48,11 +51,13 @@ class Jeu:
 
         self.horloge = pygame.time.Clock()
         self.etat = EtatJeu.PREPARATION
+        self.tir_adversaires = Minuteur(self.config.delai_tir_adversaires_initial, False)
 
         self.joueur = Joueur(self.config)
         self.formation_adversaires = FormationAdversaires(self.config)
 
         self.projectile_joueur: ProjectileJoueur | None = None
+        self.projectile_adversaire: ProjectileAdversaire| None = None
         self.clignotement_defaut = Clignotement(
             self.config.duree_clignotement_defaut_ms
         )
@@ -77,9 +82,11 @@ class Jeu:
         Initialise une nouvelle partie
         """
 
-        self.nombre_vies = self.config.nb_vies
+        self.nombre_vies = self.config.nb_vies_initiales
         self.pointage = 0
         self.vitesse_formation_adversaires = self.config.vitesse_initiale_formation_adversaires
+        self.projectiles_adversaires: list[ProjectileAdversaire] = []
+        self.tir_adversaires.changer_duree(self.config.delai_tir_adversaires_initial)
 
         # Faux rectangle (en fait c'est une ligne) qui délimite la zone où si un 
         # adversaire s'invite, le joueur perd la partie
@@ -107,10 +114,15 @@ class Jeu:
 
         self.touche_tir_precedente = False
         self.defaite_imminente = False 
+        self.projectile_joueur = None
+        self.projectiles_adversaires = []
+
+        duree_tir = self.config.delai_tir_adversaires_initial + \
+            self.config.increment_delai_tir_adversaires
+        self.tir_adversaires.changer_duree(duree_tir)
 
         self.clignotement_defaut.reinitialiser()
         self.formation_adversaires.creer_adversaires(self.vitesse_formation_adversaires)
-
 
     def _creer_surface_affichage(self, mode_fenetre: bool) -> tuple[pygame.Surface, pygame.Rect]:
         """
@@ -179,12 +191,30 @@ class Jeu:
             self._tirer_projectile_joueur()
         self.touche_tir_precedente = touche_tir
 
-        # Gestion du projectile
+        # Gestion du projectile du joueur
         if self.projectile_joueur is not None:
             self.projectile_joueur.mettre_a_jour()
-            self._gerer_collision_projectile_adversaires()
+            self._gerer_collisions_adversaires()
             if self.projectile_joueur is not None and self.projectile_joueur.est_sorti:
                 self.projectile_joueur = None
+
+        # Gestion des projectiles des adversaires
+        liste_adv = self.formation_adversaires.trouver_tireurs_valides()
+        nb_adv = len(liste_adv)
+        if nb_adv is not 0:
+            tireur = random.randint(0, nb_adv - 1)
+            if self.tir_adversaires.est_termine():
+                self.projectiles_adversaires.append(ProjectileAdversaire(liste_adv[tireur], 
+                                                                         self.config))
+                self.tir_adversaires.reinitialiser()
+
+        for pa in self.projectiles_adversaires:
+            pa.mettre_a_jour()
+
+        # Vérification si collisions avec le joueur
+        if self._gerer_collisions_joueur() is True:
+            self.etat = EtatJeu.TOUCHE
+            self.pointage -= self.pointage
 
         # Vérfication de la victoire et de la défaite
         if self.etat == EtatJeu.EXECUTION:
@@ -195,7 +225,7 @@ class Jeu:
             if self.formation_adversaires.verifier_collision(self.rect_defaite) is not None:
                 self.etat = EtatJeu.DEFAITE
 
-        # Vérification si la déftaire est proche
+        # Vérification si la défaire est proche
         if (self.etat is EtatJeu.EXECUTION
             and self.formation_adversaires.verifier_collision(self.rect_defaite_proche)
         ):
@@ -228,6 +258,9 @@ class Jeu:
         if self.projectile_joueur is not None:
             self.projectile_joueur.dessiner(self.surface_jeu)
 
+        for pa in self.projectiles_adversaires:
+            pa.dessiner(self.surface_jeu)
+
         if self.etat is EtatJeu.PREPARATION:
             self._dessiner_ecran_demarrage()
 
@@ -247,8 +280,9 @@ class Jeu:
         Affiche un court texte de diagnostic de l'état courant.
         """
 
-        texte = f"État : {self.etat.name} | " \
-                f"Aliens : {self.formation_adversaires.nombre_adversaires}"
+        texte = f"Pointage : {self.pointage}    " \
+                f"Envahisseurs : {self.formation_adversaires.nombre_adversaires}    " \
+                f"Vies : {self.nombre_vies}"
         image_texte = self.police_base.render(
             texte,
             True,
@@ -374,18 +408,38 @@ class Jeu:
             self.config,
         )
 
-    def _gerer_collision_projectile_adversaires(self) -> None:
+    def _gerer_collisions_adversaires(self) -> None:
         """
-        Gère la collision entre le projectile joueur et les adversaires.
+        Gère les collisions avec les adversaires
         """
         
-        if self.projectile_joueur is None:
-            return
+        # Projectile du joueur
+        if self.projectile_joueur is not None:
+            adv = self.formation_adversaires.verifier_collision(self.projectile_joueur.rect)
+            if adv is not None:
+                self.formation_adversaires.adversaires.remove(adv)
+                self.projectile_joueur = None
 
-        adv = self.formation_adversaires.verifier_collision(self.projectile_joueur.rect)
-        if adv is not None:
-            self.formation_adversaires.adversaires.remove(adv)
-            self.projectile_joueur = None
+        # Projectiles des adversaires
+        if len(self.projectiles_adversaires) > 0:
+            for pa in self.projectiles_adversaires:
+                if self.joueur.verifier_collision(pa.rect):
+                    self.projectiles_adversaires.remove(pa)
+                    self.etat = EtatJeu.TOUCHE
+
+    def _gerer_collisions_joueur(self) -> bool:
+        """
+        Gère les collisions avec le joueur. Retourne true si collision
+        """
+        
+        # Projectiles des adversaires
+        if len(self.projectiles_adversaires) > 0:
+            for pa in self.projectiles_adversaires:
+                if self.joueur.verifier_collision(pa.rect):
+                    self.projectiles_adversaires.remove(pa)
+                    return True
+
+        return False
 
     def executer(self) -> None:
         """

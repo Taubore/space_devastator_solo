@@ -45,6 +45,7 @@ class Jeu:
         self.surface_affichage, self.zone_affichage = (
             self._creer_surface_affichage(mode_fenetre)
         )
+
         self.image_fond = self._charger_image_fond()
 
         pygame.display.set_caption(self.config.titre)
@@ -106,7 +107,7 @@ class Jeu:
             1,
         )
 
-    def _initialiser_session(self) -> None:
+    def _nouveau_tableau(self) -> None:
         """
         Initialise une nouvelle session en début de partie ou après avoir éliminé
         tous les adversaires.
@@ -161,8 +162,12 @@ class Jeu:
                     self.etat is not EtatJeu.EXECUTION 
                     and evenement.key == pygame.K_SPACE
                 ):
+                    if self.etat is EtatJeu.VICTOIRE or self.etat is EtatJeu.PREPARATION:
+                        self._nouveau_tableau()
+                    if self.etat is EtatJeu.DEFAITE:
+                        self._initialiser_partie()
+                        self._nouveau_tableau()
                     self.etat = EtatJeu.EXECUTION
-                    self._initialiser_session()        
 
     def _mettre_a_jour(self) -> None:
         """
@@ -201,35 +206,39 @@ class Jeu:
         # Gestion des projectiles des adversaires
         liste_adv = self.formation_adversaires.trouver_tireurs_valides()
         nb_adv = len(liste_adv)
-        if nb_adv is not 0:
+        if nb_adv != 0:
             tireur = random.randint(0, nb_adv - 1)
             if self.tir_adversaires.est_termine():
                 self.projectiles_adversaires.append(ProjectileAdversaire(liste_adv[tireur], 
                                                                          self.config))
                 self.tir_adversaires.reinitialiser()
 
+        # Met à jour les projectiles des adversaires et retire le projectile s'il est sorti
+        # de l'écran
         for pa in self.projectiles_adversaires:
             pa.mettre_a_jour()
+            if pa.est_sorti:
+                self.projectiles_adversaires.remove(pa)
 
-        # Vérification si collisions avec le joueur
-        if self._gerer_collisions_joueur() is True:
-            self.etat = EtatJeu.TOUCHE
-            self.pointage -= self.pointage
-
-        # Vérfication de la victoire et de la défaite
-        if self.etat == EtatJeu.EXECUTION:
-            if self.formation_adversaires.nombre_adversaires == 0:
-                self.etat = EtatJeu.VICTOIRE
-                self.vitesse_formation_adversaires += \
-                    self.config.increment_vitesse_formation_adversaires
-            if self.formation_adversaires.verifier_collision(self.rect_defaite) is not None:
-                self.etat = EtatJeu.DEFAITE
-
-        # Vérification si la défaire est proche
+        # Vérification si la défaite est proche
         if (self.etat is EtatJeu.EXECUTION
             and self.formation_adversaires.verifier_collision(self.rect_defaite_proche)
         ):
             self.defaite_imminente = True
+            # Vérification si adversaire a atteint la ligne de défaite, si oui défaite immédiate
+            if self.formation_adversaires.verifier_collision(self.rect_defaite) is not None:
+                self.etat = EtatJeu.DEFAITE
+
+        # Vérification si collisions avec le joueur
+        if self._gerer_collisions_joueur() is True:
+            self.nombre_vies -= 1
+            self.etat = EtatJeu.DEFAITE if self.nombre_vies <= 0 else EtatJeu.TOUCHE
+
+        # Vérfication de la victoire et de la défaite
+        if self.formation_adversaires.nombre_adversaires == 0:
+            self.etat = EtatJeu.VICTOIRE
+            self.vitesse_formation_adversaires += \
+                self.config.increment_vitesse_formation_adversaires
 
     def _dessiner(self) -> None:
         """
@@ -241,7 +250,8 @@ class Jeu:
 
         self.formation_adversaires.dessiner(self.surface_jeu) 
 
-        self.joueur.dessiner(self.surface_jeu)
+        if self.etat is not EtatJeu.TOUCHE and self.etat is not EtatJeu.DEFAITE :
+            self.joueur.dessiner(self.surface_jeu)
 
         # Dessiner l'axe de défaite, il restera affiché jusqu'à une défaite ou victoire.
         if (
@@ -262,13 +272,13 @@ class Jeu:
             pa.dessiner(self.surface_jeu)
 
         if self.etat is EtatJeu.PREPARATION:
-            self._dessiner_ecran_demarrage()
-
-        if self.etat is EtatJeu.VICTOIRE:
-            self._dessiner_ecran_victoire()
-
-        if self.etat is EtatJeu.DEFAITE:
-            self._dessiner_ecran_defaite()
+            self._dessiner_demarrage()
+        elif self.etat is EtatJeu.TOUCHE:
+            self._dessiner_touche()
+        elif self.etat is EtatJeu.VICTOIRE:
+            self._dessiner_victoire()
+        elif self.etat is EtatJeu.DEFAITE:
+            self._dessiner_defaite()
 
         self._dessiner_etat()
         self._presenter_image()
@@ -290,92 +300,114 @@ class Jeu:
         )
         self.surface_jeu.blit(image_texte, (20, 20))
 
-    def _dessiner_ecran_demarrage(self) -> None:
+    def _dessiner_demarrage(self) -> None:
         """
         Affiche le titre du jeu et l'instruction pour démarrer.
         """
 
-        image_titre = self.police_titre.render(
+        texte_1 = self.police_titre.render(
             self.config.titre,
             True,
             self.config.couleur_texte,
         )
-        image_instruction = self.police_texte.render(
+        texte_2 = self.police_texte.render(
             "Appuyez ESPACE pour démarrer",
             True,
             self.config.couleur_texte,
         )
 
-        rect_titre = image_titre.get_rect(
+        rect_1 = texte_1.get_rect(
             center=(
                 self.surface_jeu.get_width() // 2,
                 self.surface_jeu.get_height() // 3
             )
         )
-        rect_instruction = image_instruction.get_rect(
-            midtop=(rect_titre.centerx, rect_titre.bottom + 24)
+        rect_2 = texte_2.get_rect(
+            midtop=(rect_1.centerx, rect_1.bottom + 24)
         )
 
-        self.surface_jeu.blit(image_titre, rect_titre)
-        self.surface_jeu.blit(image_instruction, rect_instruction)
+        self.surface_jeu.blit(texte_1, rect_1)
+        self.surface_jeu.blit(texte_2, rect_2)
 
-    def _dessiner_ecran_victoire(self) -> None:
+    def _dessiner_victoire(self) -> None:
         """
         Affiche la victoire et un message pour poursuivre
         """
 
-        image_victoire = self.police_titre.render(
+        texte_1 = self.police_titre.render(
             "Bravo! Vous avez vaincu tous les envahisseurs!",
             True,
             self.config.couleur_texte,
         )
-        image_instruction = self.police_texte.render(
+        texte_2 = self.police_texte.render(
             "Appuyez ESPACE pour poursuivre. D'autres s'en viennent...",
             True,
             self.config.couleur_texte,
         )
 
-        rect_titre = image_victoire.get_rect(
+        rect_1 = texte_1.get_rect(
             center=(
                 self.surface_jeu.get_width() // 2,
                 self.surface_jeu.get_height() // 3
             )
         )
-        rect_instruction = image_instruction.get_rect(
-            midtop=(rect_titre.centerx, rect_titre.bottom + 24)
+        rect_2 = texte_2.get_rect(
+            midtop=(rect_1.centerx, rect_1.bottom + 24)
         )
 
-        self.surface_jeu.blit(image_victoire, rect_titre)
-        self.surface_jeu.blit(image_instruction, rect_instruction)
+        self.surface_jeu.blit(texte_1, rect_1)
+        self.surface_jeu.blit(texte_2, rect_2)
 
-    def _dessiner_ecran_defaite(self) -> None:
+    def _dessiner_touche(self) -> None:
+        """
+        Affiche un message lorsque le joueur a été touché et qu'il lui reste encore plus d'une vie.
+        """
+
+        if self.nombre_vies > 0:
+            texte_1 = self.police_texte.render(
+                "Vaisseau touché! Appuyer ESPACE pour continuer...",
+                True,
+                self.config.couleur_texte,
+            )
+
+            rect_1 = texte_1.get_rect(
+                center=(
+                    self.surface_jeu.get_width() // 2,
+                    self.surface_jeu.get_height() - 100
+                )
+            )
+
+            self.surface_jeu.blit(texte_1, rect_1)
+
+
+    def _dessiner_defaite(self) -> None:
         """
         Affiche un message comme quoi le joueur s'est fait envahir, qu'il a perdu.
         """
 
-        image_victoire = self.police_titre.render(
-            "Vous avez été envahit par les extraterrestres!",
+        texte_1 = self.police_titre.render(
+            "La terre a été envahie par les extraterrestres!",
             True,
             self.config.couleur_texte,
         )
-        image_instruction = self.police_texte.render(
-            "Appuyez ESPACE pour poursuivre.",
+        texte_2 = self.police_texte.render(
+            "Appuyez ESPACE pour une nouvelle partie.",
             True,
             self.config.couleur_texte,
         )
 
-        rect_titre = image_victoire.get_rect(
+        rect_1 = texte_1.get_rect(
             center=(
                 self.surface_jeu.get_width() // 2,
                 self.surface_jeu.get_height() // 3
             )
         )
-        rect_instruction = image_instruction.get_rect(
-            midtop=(rect_titre.centerx, rect_titre.bottom + 24)
+        rect_2 = texte_2.get_rect(
+            midtop=(rect_1.centerx, rect_1.bottom + 24)
         )
 
-        self.surface_jeu.blit(image_victoire, rect_titre)
-        self.surface_jeu.blit(image_instruction, rect_instruction)
+        self.surface_jeu.blit(texte_1, rect_1)
+        self.surface_jeu.blit(texte_2, rect_2)
 
     def _presenter_image(self) -> None:
         """
@@ -404,35 +436,28 @@ class Jeu:
 
         self.projectile_joueur = ProjectileJoueur(
             self.joueur.rect.centerx,
-            self.joueur.rect.top,
+            self.joueur.rect.top + self.config.hauteur_projectile_joueur,
             self.config,
         )
 
     def _gerer_collisions_adversaires(self) -> None:
         """
-        Gère les collisions avec les adversaires
+        Gère les collisions d'un projectile du joueur avec les adversaires
         """
         
-        # Projectile du joueur
         if self.projectile_joueur is not None:
             adv = self.formation_adversaires.verifier_collision(self.projectile_joueur.rect)
             if adv is not None:
                 self.formation_adversaires.adversaires.remove(adv)
                 self.projectile_joueur = None
 
-        # Projectiles des adversaires
-        if len(self.projectiles_adversaires) > 0:
-            for pa in self.projectiles_adversaires:
-                if self.joueur.verifier_collision(pa.rect):
-                    self.projectiles_adversaires.remove(pa)
-                    self.etat = EtatJeu.TOUCHE
-
     def _gerer_collisions_joueur(self) -> bool:
         """
-        Gère les collisions avec le joueur. Retourne true si collision
+        Gère les collisions des projectiles adversaire avec le joueur. 
+        S'assure de retirer le projectile de la liste s'il y a collision.
+        Retour : true si collision.
         """
         
-        # Projectiles des adversaires
         if len(self.projectiles_adversaires) > 0:
             for pa in self.projectiles_adversaires:
                 if self.joueur.verifier_collision(pa.rect):

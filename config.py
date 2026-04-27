@@ -27,6 +27,8 @@ class Configuration:
     couleur_texte: tuple[int, int, int] = (230, 230, 230)
     couleur_axe_defaite : tuple[int, int, int] = (120, 0, 0)
     image_fond_ecran: str = "assets/images/fond_ecran.png"
+    image_joueur: str = "assets/images/vaisseau.png"
+    image_adversaire: str = "assets/images/soucoupe_volante.png"
 
     duree_clignotement_defaut_ms: int = 500
     nb_vies_initiales: int = 3

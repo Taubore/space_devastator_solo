@@ -30,12 +30,19 @@ class Joueur:
             config.hauteur_joueur,
         )
 
+        self.image = pygame.image.load(self.config.image_joueur).convert_alpha()
+        self.image = pygame.transform.smoothscale(
+            self.image,
+            (self.config.largeur_joueur, self.config.hauteur_joueur),
+        )
+
     def dessiner(self, surface: pygame.Surface) -> None:
         """
-        Dessine le joueur avec une forme simple temporaire.
+        Dessine le joueur.
         """
-
-        pygame.draw.rect(surface, self.config.couleur_joueur, self.rect)
+    
+        surface.blit(self.image, self.rect)
+        #pygame.draw.rect(surface, self.config.couleur_joueur, self.rect)
 
     def deplacer(self, direction: DirectionHorizontale) -> None:
         """
@@ -65,6 +72,7 @@ class Adversaire:
         """
         Constructeur
         """
+
         self.config = config
         self.rect = pygame.Rect(
             x,
@@ -73,10 +81,17 @@ class Adversaire:
             config.hauteur_adversaire,
         )
 
+        self.image = pygame.image.load(config.image_adversaire).convert_alpha()
+        self.image = pygame.transform.smoothscale(
+            self.image,
+            (config.largeur_adversaire, config.hauteur_adversaire),
+)
+
     def dessiner(self, surface: pygame.Surface) -> None:
         """Dessine un alien avec une forme simple temporaire."""
 
-        pygame.draw.rect(surface, self.config.couleur_adversaire, self.rect)
+        #pygame.draw.rect(surface, self.config.couleur_adversaire, self.rect)
+        surface.blit(self.image, self.rect)
 
 
 class FormationAdversaires:
@@ -226,7 +241,7 @@ class ProjectileJoueur:
 
     def dessiner(self, surface: pygame.Surface) -> None:
         """
-        Dessine temporairement le projectile sous forme de rectangle.
+        Dessine le projectile sous forme de rectangle.
         """
         
         pygame.draw.rect(
@@ -252,7 +267,7 @@ class ProjectileAdversaire:
             config.hauteur_projectile_adversaire,
         )
         self.rect.centerx = adv.rect.centerx
-        self.rect.bottom = adv.rect.bottom
+        self.rect.bottom = adv.rect.bottom - config.hauteur_projectile_adversaire
         self.limite_projectile_bas = config.limite_y_max_zone_jouable
         
     @property

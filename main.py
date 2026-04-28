@@ -16,6 +16,7 @@ from objets import (
     Joueur,
     Adversaire,
     FormationAdversaires,
+    AnimationApprocheAdversaires,
     ProjectileJoueur,
     ProjectileAdversaire,
 )
@@ -46,6 +47,9 @@ class Jeu:
             self._creer_surface_affichage(mode_fenetre)
         )
 
+        # On cache le curseur de la souris
+        pygame.mouse.set_visible(False)
+
         self.image_fond = self._charger_image_fond()
 
         pygame.display.set_caption(self.config.titre)
@@ -56,6 +60,7 @@ class Jeu:
 
         self.joueur = Joueur(self.config)
         self.formation_adversaires = FormationAdversaires(self.config)
+        self.animation_approche_adversaires = AnimationApprocheAdversaires(self.config)
 
         self.projectile_joueur: ProjectileJoueur | None = None
         self.projectile_adversaire: ProjectileAdversaire| None = None
@@ -124,6 +129,7 @@ class Jeu:
 
         self.clignotement_defaut.reinitialiser()
         self.formation_adversaires.creer_adversaires(self.vitesse_formation_adversaires)
+        self.animation_approche_adversaires.demarrer(self.formation_adversaires)
 
     def _creer_surface_affichage(self, mode_fenetre: bool) -> tuple[pygame.Surface, pygame.Rect]:
         """
@@ -158,22 +164,34 @@ class Jeu:
                 if evenement.key == pygame.K_ESCAPE:
                     self.etat = EtatJeu.FERMETURE
 
-                if (
-                    self.etat is not EtatJeu.EXECUTION 
-                    and evenement.key == pygame.K_SPACE
-                ):
-                    if self.etat is EtatJeu.VICTOIRE or self.etat is EtatJeu.PREPARATION:
+                if evenement.key == pygame.K_SPACE:
+                    if (
+                        self.etat is EtatJeu.VICTOIRE
+                        or self.etat is EtatJeu.PREPARATION
+                    ):
                         self._nouveau_tableau()
-                    if self.etat is EtatJeu.DEFAITE:
+                        self.etat = EtatJeu.APPROCHE
+                    elif self.etat is EtatJeu.DEFAITE:
                         self._initialiser_partie()
                         self._nouveau_tableau()
-                    self.etat = EtatJeu.EXECUTION
+                        self.etat = EtatJeu.APPROCHE
+                    elif self.etat is EtatJeu.TOUCHE:
+                        self.projectile_joueur = None
+                        self.projectiles_adversaires = []
+                        self.touche_tir_precedente = False
+                        self.etat = EtatJeu.EXECUTION
 
     def _mettre_a_jour(self) -> None:
         """
         Met à jour la logique du jeu.
         """
         
+        if self.etat is EtatJeu.APPROCHE:
+            if self.animation_approche_adversaires.mettre_a_jour():
+                self.tir_adversaires.reinitialiser()
+                self.etat = EtatJeu.EXECUTION
+            return
+
         if self.etat is not EtatJeu.EXECUTION:
             return
 
@@ -213,12 +231,16 @@ class Jeu:
                                                                          self.config))
                 self.tir_adversaires.reinitialiser()
 
-        # Met à jour les projectiles des adversaires et retire le projectile s'il est sorti
-        # de l'écran
+        # Met à jour les projectiles des adversaires
         for pa in self.projectiles_adversaires:
             pa.mettre_a_jour()
-            if pa.est_sorti:
-                self.projectiles_adversaires.remove(pa)
+
+        # Rebâtit une liste avec les éléments qui ne sont pas sortis
+        self.projectiles_adversaires = [
+            pa
+            for pa in self.projectiles_adversaires
+            if not pa.est_sorti
+        ]
 
         # Vérification si la défaite est proche
         if (self.etat is EtatJeu.EXECUTION
@@ -248,7 +270,13 @@ class Jeu:
         self.surface_jeu.blit(self.image_fond, (0, 0))
         temps_actuel = pygame.time.get_ticks()
 
-        self.formation_adversaires.dessiner(self.surface_jeu) 
+        if self.etat is EtatJeu.APPROCHE:
+            self.animation_approche_adversaires.dessiner(
+                self.surface_jeu,
+                self.formation_adversaires,
+            )
+        else:
+            self.formation_adversaires.dessiner(self.surface_jeu)
 
         if self.etat is not EtatJeu.TOUCHE and self.etat is not EtatJeu.DEFAITE :
             self.joueur.dessiner(self.surface_jeu)
@@ -291,14 +319,21 @@ class Jeu:
         """
 
         texte = f"Pointage : {self.pointage}    " \
-                f"Envahisseurs : {self.formation_adversaires.nombre_adversaires}    " \
                 f"Vies : {self.nombre_vies}"
-        image_texte = self.police_base.render(
+        image_texte = self.police_texte.render(
             texte,
             True,
             self.config.couleur_texte,
         )
-        self.surface_jeu.blit(image_texte, (20, 20))
+
+        rect_1 = image_texte.get_rect(
+            center=(
+                self.surface_jeu.get_width() // 2,
+                20
+            )
+        )
+
+        self.surface_jeu.blit(image_texte, rect_1)
 
     def _dessiner_demarrage(self) -> None:
         """
@@ -450,6 +485,7 @@ class Jeu:
             if adv is not None:
                 self.formation_adversaires.adversaires.remove(adv)
                 self.projectile_joueur = None
+                self.pointage += self.config.points_par_adversaire
 
     def _gerer_collisions_joueur(self) -> bool:
         """
@@ -457,14 +493,16 @@ class Jeu:
         S'assure de retirer le projectile de la liste s'il y a collision.
         Retour : true si collision.
         """
-        
-        if len(self.projectiles_adversaires) > 0:
-            for pa in self.projectiles_adversaires:
-                if self.joueur.verifier_collision(pa.rect):
-                    self.projectiles_adversaires.remove(pa)
-                    return True
 
-        return False
+        nb_projectiles_avant = len(self.projectiles_adversaires)
+
+        self.projectiles_adversaires = [
+            pa
+            for pa in self.projectiles_adversaires
+            if not self.joueur.verifier_collision(pa.rect)
+        ]
+
+        return len(self.projectiles_adversaires) != nb_projectiles_avant
 
     def executer(self) -> None:
         """

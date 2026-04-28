@@ -39,3 +39,10 @@ Depuis VSCode :
   affichages visibles / cachés
 - La durée par défaut `duree_clignotement_defaut_ms = 500` correspond à
   `500 ms` visible puis `500 ms` masqué
+- Au lancement d'un tableau, les adversaires ont une courte animation
+  d'approche : ils apparaissent un à un, grossissent jusqu'à leur taille
+  normale, puis restent visibles avant le début réel de la partie
+- La vitesse de cette approche est réglée par
+  `duree_approche_adversaire_ms` dans `config.py`
+- Les adversaires arrivent un à un dans un ordre aléatoire ; chaque adversaire
+  passe de petit à sa taille normale avant que le suivant commence

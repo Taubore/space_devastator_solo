@@ -1,5 +1,7 @@
 """Objets principaux qui composent le jeu."""
 
+import random
+
 import pygame
 from config import Configuration
 from etats import DirectionHorizontale
@@ -203,6 +205,92 @@ class FormationAdversaires:
 
         for adv in self.adversaires:
             adv.dessiner(surface)
+
+
+class AnimationApprocheAdversaires:
+    """Anime l'arrivée des adversaires en les dessinant de plus en plus grands."""
+
+    def __init__(self, config: Configuration) -> None:
+        """
+        Constructeur.
+        """
+
+        self.config = config
+        self.instant_depart = 0
+        self.adversaires_a_animer: list[Adversaire] = []
+        self.index_adversaire = 0
+        self.echelles_par_adversaire: dict[Adversaire, float] = {}
+
+    def demarrer(self, formation_adversaires: FormationAdversaires) -> None:
+        """
+        Démarre l'animation d'approche.
+        """
+
+        self.instant_depart = pygame.time.get_ticks()
+
+        self.adversaires_a_animer = formation_adversaires.adversaires.copy()
+        random.shuffle(self.adversaires_a_animer)
+        self.index_adversaire = 0
+        self.echelles_par_adversaire = {
+            adv: 0.0
+            for adv in formation_adversaires.adversaires
+        }
+
+    def mettre_a_jour(self) -> bool:
+        """
+        Met à jour l'échelle courante de chaque adversaire.
+
+        Retourne True lorsque l'animation est terminée.
+        """
+
+        duree_ms = self.config.duree_approche_adversaire_ms
+
+        if duree_ms <= 0 or not self.adversaires_a_animer:
+            self.echelles_par_adversaire = {
+                adv: 1.0
+                for adv in self.echelles_par_adversaire
+            }
+            return True
+
+        if self.index_adversaire >= len(self.adversaires_a_animer):
+            return True
+
+        adversaire_courant = self.adversaires_a_animer[self.index_adversaire]
+        temps_animation = pygame.time.get_ticks() - self.instant_depart
+        echelle_depart = self.config.echelle_initiale_approche_adversaires
+        progression = min(temps_animation / duree_ms, 1.0)
+        echelle = echelle_depart + (1.0 - echelle_depart) * progression
+        self.echelles_par_adversaire[adversaire_courant] = echelle
+
+        if progression < 1.0:
+            return False
+
+        self.echelles_par_adversaire[adversaire_courant] = 1.0
+        self.index_adversaire += 1
+        self.instant_depart = pygame.time.get_ticks()
+
+        return self.index_adversaire >= len(self.adversaires_a_animer)
+
+    def dessiner(
+        self,
+        surface: pygame.Surface,
+        formation_adversaires: FormationAdversaires,
+    ) -> None:
+        """
+        Dessine les adversaires avec leur échelle courante.
+        """
+
+        for adv in formation_adversaires.adversaires:
+            echelle = self.echelles_par_adversaire.get(adv, 1.0)
+
+            if echelle <= 0.0:
+                continue
+
+            largeur = max(1, int(adv.rect.width * echelle))
+            hauteur = max(1, int(adv.rect.height * echelle))
+            image = pygame.transform.smoothscale(adv.image, (largeur, hauteur))
+            rect = image.get_rect(center=adv.rect.center)
+            surface.blit(image, rect)
 
 
 class ProjectileJoueur:

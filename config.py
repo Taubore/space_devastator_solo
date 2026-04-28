@@ -14,7 +14,7 @@ class Configuration:
     images_par_seconde: int = 60
 
     limite_x_min_zone_jouable: int = 30
-    limite_y_min_zone_jouable: int = 30
+    limite_y_min_zone_jouable: int = 60
     limite_x_max_zone_jouable: int = largeur_fenetre - limite_x_min_zone_jouable
     limite_y_max_zone_jouable: int = hauteur_fenetre - limite_y_min_zone_jouable
 
@@ -32,6 +32,7 @@ class Configuration:
 
     duree_clignotement_defaut_ms: int = 500
     nb_vies_initiales: int = 3
+    points_par_adversaire: int = 100
 
     # Joueur
     couleur_joueur: tuple[int, int, int] = (80, 220, 255)  # À retirer lorsque sprite
@@ -57,6 +58,8 @@ class Configuration:
     espacement_adversaire_y: int = 40
     depart_adversaire_grille_x: int = 208
     depart_adversaire_grille_y: int = limite_y_min_zone_jouable
+    duree_approche_adversaire_ms: int = 50
+    echelle_initiale_approche_adversaires: float = 0.50
 
     # Projectile joueur
     couleur_projectile_joueur: tuple[int, int, int] = (255, 127, 0)  # À retirer
@@ -72,6 +75,5 @@ class Configuration:
     hauteur_projectile_adversaire: int = 18
     vitesse_projectile_adversaire: int = 6
 
-    delai_tir_adversaires_initial: int = 5500
+    delai_tir_adversaires_initial: int = 2500
     increment_delai_tir_adversaires: int = -500
-

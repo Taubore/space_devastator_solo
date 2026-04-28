@@ -7,6 +7,7 @@ class EtatJeu(Enum):
     """Représente l'état actuel du jeu."""
 
     PREPARATION = auto()
+    APPROCHE = auto()
     EXECUTION = auto()
     FERMETURE = auto()
     VICTOIRE = auto()

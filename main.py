@@ -11,7 +11,7 @@ import pygame
 
 from config import Configuration
 from etats import EtatJeu, DirectionHorizontale
-from commun import Minuteur, Clignotement
+from commun import Minuteur, Clignotement, AfficheurTexte
 from objets import (
     Joueur,
     Adversaire,
@@ -71,6 +71,13 @@ class Jeu:
         self.police_titre = pygame.font.Font(None, self.config.taille_police_titre)
         self.police_texte = pygame.font.Font(None, self.config.taille_police_texte)
         self.police_base = pygame.font.Font(None, self.config.taille_police_base)
+
+        # Objet utilitaire pour afficher du texte à l'écran.
+        self.afficheur_texte = AfficheurTexte(
+            self.surface_jeu,
+            self.config.taille_police_texte,
+            self.config.couleur_texte,
+        )
 
     def _charger_image_fond(self) -> pygame.Surface:
         """
@@ -300,149 +307,66 @@ class Jeu:
             pa.dessiner(self.surface_jeu)
 
         if self.etat is EtatJeu.PREPARATION:
-            self._dessiner_demarrage()
+            rect = self.afficheur_texte.dessiner(
+                self.config.titre,
+                50,
+                40,
+                self.config.taille_police_titre,
+            )
+            self.afficheur_texte.dessiner(
+                "Appuyez ESPACE pour démarrer",
+                50,
+                40,
+                decalage_y_px=rect.height + 10
+            )
         elif self.etat is EtatJeu.TOUCHE:
-            self._dessiner_touche()
+            rect = self.afficheur_texte.dessiner(
+                "Vaisseau touché!",
+                50,
+                75,
+                self.config.taille_police_titre,
+            )
+            self.afficheur_texte.dessiner(
+                "Appuyez ESPACE pour continuer",
+                50,
+                75,
+                decalage_y_px=rect.height + 10
+            )
         elif self.etat is EtatJeu.VICTOIRE:
-            self._dessiner_victoire()
+            rect = self.afficheur_texte.dessiner(
+                "Bravo! Vous avez vaincu tous les envahisseurs!",
+                50,
+                40,
+                self.config.taille_police_titre,
+            )
+            self.afficheur_texte.dessiner(
+                "Appuyez ESPACE pour continuer",
+                50,
+                40,
+                decalage_y_px=rect.height + 10
+            )
         elif self.etat is EtatJeu.DEFAITE:
-            self._dessiner_defaite()
+            rect = self.afficheur_texte.dessiner(
+                "La terre a été envahie par les extraterrestres!",
+                50,
+                20,
+                self.config.taille_police_titre,
+            )
+            self.afficheur_texte.dessiner(
+                "Appuyez ESPACE pour une nouvelle partie",
+                50,
+                20,
+                decalage_y_px=rect.height + 10
+            )
 
-        self._dessiner_etat()
+        # Dessine le pointage et les vies
+        self.afficheur_texte.dessiner(str(self.pointage), 50, 98, self.config.taille_police_texte)
+        texte = f"Vaisseaux : {self.nombre_vies}"
+        self.afficheur_texte.dessiner(texte, 98, 98, self.config.taille_police_base)
+
         self._presenter_image()
 
         pygame.display.flip()
-
-    def _dessiner_etat(self) -> None:
-        """
-        Affiche un court texte de diagnostic de l'état courant.
-        """
-
-        texte = f"Pointage : {self.pointage}    " \
-                f"Vies : {self.nombre_vies}"
-        image_texte = self.police_texte.render(
-            texte,
-            True,
-            self.config.couleur_texte,
-        )
-
-        rect_1 = image_texte.get_rect(
-            center=(
-                self.surface_jeu.get_width() // 2,
-                20
-            )
-        )
-
-        self.surface_jeu.blit(image_texte, rect_1)
-
-    def _dessiner_demarrage(self) -> None:
-        """
-        Affiche le titre du jeu et l'instruction pour démarrer.
-        """
-
-        texte_1 = self.police_titre.render(
-            self.config.titre,
-            True,
-            self.config.couleur_texte,
-        )
-        texte_2 = self.police_texte.render(
-            "Appuyez ESPACE pour démarrer",
-            True,
-            self.config.couleur_texte,
-        )
-
-        rect_1 = texte_1.get_rect(
-            center=(
-                self.surface_jeu.get_width() // 2,
-                self.surface_jeu.get_height() // 3
-            )
-        )
-        rect_2 = texte_2.get_rect(
-            midtop=(rect_1.centerx, rect_1.bottom + 24)
-        )
-
-        self.surface_jeu.blit(texte_1, rect_1)
-        self.surface_jeu.blit(texte_2, rect_2)
-
-    def _dessiner_victoire(self) -> None:
-        """
-        Affiche la victoire et un message pour poursuivre
-        """
-
-        texte_1 = self.police_titre.render(
-            "Bravo! Vous avez vaincu tous les envahisseurs!",
-            True,
-            self.config.couleur_texte,
-        )
-        texte_2 = self.police_texte.render(
-            "Appuyez ESPACE pour poursuivre. D'autres s'en viennent...",
-            True,
-            self.config.couleur_texte,
-        )
-
-        rect_1 = texte_1.get_rect(
-            center=(
-                self.surface_jeu.get_width() // 2,
-                self.surface_jeu.get_height() // 3
-            )
-        )
-        rect_2 = texte_2.get_rect(
-            midtop=(rect_1.centerx, rect_1.bottom + 24)
-        )
-
-        self.surface_jeu.blit(texte_1, rect_1)
-        self.surface_jeu.blit(texte_2, rect_2)
-
-    def _dessiner_touche(self) -> None:
-        """
-        Affiche un message lorsque le joueur a été touché et qu'il lui reste encore plus d'une vie.
-        """
-
-        if self.nombre_vies > 0:
-            texte_1 = self.police_texte.render(
-                "Vaisseau touché! Appuyer ESPACE pour continuer...",
-                True,
-                self.config.couleur_texte,
-            )
-
-            rect_1 = texte_1.get_rect(
-                center=(
-                    self.surface_jeu.get_width() // 2,
-                    self.surface_jeu.get_height() - 100
-                )
-            )
-
-            self.surface_jeu.blit(texte_1, rect_1)
-
-
-    def _dessiner_defaite(self) -> None:
-        """
-        Affiche un message comme quoi le joueur s'est fait envahir, qu'il a perdu.
-        """
-
-        texte_1 = self.police_titre.render(
-            "La terre a été envahie par les extraterrestres!",
-            True,
-            self.config.couleur_texte,
-        )
-        texte_2 = self.police_texte.render(
-            "Appuyez ESPACE pour une nouvelle partie.",
-            True,
-            self.config.couleur_texte,
-        )
-
-        rect_1 = texte_1.get_rect(
-            center=(
-                self.surface_jeu.get_width() // 2,
-                self.surface_jeu.get_height() // 3
-            )
-        )
-        rect_2 = texte_2.get_rect(
-            midtop=(rect_1.centerx, rect_1.bottom + 24)
-        )
-
-        self.surface_jeu.blit(texte_1, rect_1)
-        self.surface_jeu.blit(texte_2, rect_2)
 
     def _presenter_image(self) -> None:
         """

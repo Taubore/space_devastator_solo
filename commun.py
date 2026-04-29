@@ -97,3 +97,63 @@ class Clignotement:
         """
 
         self.minuteur_phase.reinitialiser()
+
+class AfficheurTexte:
+    def __init__(
+        self,
+        surface: pygame.Surface,
+        taille_defaut: int,
+        couleur_defaut: tuple[int, int, int],
+        police: str = "",
+    ) -> None:
+        """
+        Constructeur
+        """
+
+        self.surface = surface
+        self.taille = taille_defaut
+        self.couleur = couleur_defaut
+        self.police = pygame.font.Font(None if police == "" else police, taille_defaut)
+
+    def dessiner(
+        self,
+        texte: str,
+        pctX: int,
+        pctY: int,
+        taille: int = -1,
+        couleur: tuple[int, int, int] = (-1, -1, -1),
+        decalage_y_px: int = 0,
+    ) -> pygame.Rect:
+        """
+        Dessine le texte passé en paramètre à la position relative indiquée. La position relative
+        est calculé en pourcentage de la surface qui a été passé en paramètre à l'objet
+        AfficherTexte. Par exemple, pour avoir un texte centré dans la surface, il faut que posX 
+        soit à 50 et posY à 50. Si on veut du texte justifiée en bas à droite, il faut posX à 100 
+        et posY à 100 
+        """
+        if taille != -1:
+            self.police.point_size = taille
+        else:
+            self.police.point_size = self.taille
+
+        couleur_texte = couleur if couleur != (-1, -1, -1) else self.couleur
+
+        surface_txt = self.police.render(
+            texte,
+            True,
+            couleur_texte,
+        )
+
+        position_x = round(self.surface.get_width() * pctX / 100)
+        position_y = round(self.surface.get_height() * pctY / 100)
+        decalage_x = round(surface_txt.get_width() * pctX / 100)
+        decalage_y = round(surface_txt.get_height() * pctY / 100) - decalage_y_px
+
+        rect = surface_txt.get_rect(
+            topleft=(position_x - decalage_x, position_y - decalage_y)
+        )
+        
+        self.surface.blit(surface_txt, rect)
+
+        return rect
+        

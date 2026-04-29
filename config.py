@@ -19,8 +19,8 @@ class Configuration:
     limite_y_max_zone_jouable: int = hauteur_fenetre - limite_y_min_zone_jouable
 
     titre: str = "Space Devastator solo"
-    taille_police_titre: int = 68
-    taille_police_texte: int = 32
+    taille_police_titre: int = 50
+    taille_police_texte: int = 22
     taille_police_base: int = 18
     
     couleur_fond: tuple[int, int, int] = (8, 10, 20)
@@ -49,7 +49,7 @@ class Configuration:
     
     largeur_adversaire: int = 64
     hauteur_adversaire: int = 64
-    vitesse_initiale_formation_adversaires: int = 1
+    vitesse_initiale_formation_adversaires: int = 2
     descente_formation_adversaires: int = 16
     increment_vitesse_formation_adversaires: int = 1
     colonnes_adversaires: int = 8

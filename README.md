@@ -37,7 +37,7 @@ Depuis VSCode :
   basé sur `pygame.time.get_ticks()`
 - `Clignotement` reste disponible comme surcouche spécialisée pour les
   affichages visibles / cachés
-- La durée par défaut `duree_clignotement_defaut_ms = 500` correspond à
+- La durée par défaut `freq_clignotement_defaut_ms = 500` correspond à
   `500 ms` visible puis `500 ms` masqué
 - Au lancement d'un tableau, les adversaires ont une courte animation
   d'approche : ils apparaissent un à un, grossissent jusqu'à leur taille

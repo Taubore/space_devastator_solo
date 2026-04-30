@@ -8,11 +8,10 @@ import random
 
 import pygame
 
-
 from config import Configuration
 from etats import EtatJeu, DirectionHorizontale
 from commun import Minuteur, Clignotement, AfficheurTexte
-from effets import Explosion
+from effets import EffetVisuel, Explosion, FlashTir
 from objets import (
     Joueur,
     FormationAdversaires,
@@ -33,6 +32,7 @@ class Jeu:
         """
 
         pygame.init()
+        pygame.mixer.init()
 
         self.config = Configuration()
 
@@ -50,10 +50,15 @@ class Jeu:
 
         self.image_fond = self._charger_image_fond()
 
+        self._charger_sons()
+
         pygame.display.set_caption(self.config.titre)
 
         self.horloge = pygame.time.Clock()
         self.tir_adversaires = Minuteur(self.config.delai_tir_adversaires_initial, False)
+        self.duree_clignotement_joueur_touche = Minuteur(
+            self.config.duree_clignotement_joueur_touche_ms, False
+            )
 
         self.joueur = Joueur(self.config)
         self.formation_adversaires = FormationAdversaires(self.config)
@@ -61,9 +66,12 @@ class Jeu:
 
         self.projectile_joueur: ProjectileJoueur | None = None
         self.projectiles_adversaires: list[ProjectileAdversaire] = []
-        self.effets_visuels: list[Explosion] = []
+        self.effets_visuels: list[EffetVisuel] = []
         
-        self.clignotement_defaut = Clignotement(self.config.duree_clignotement_defaut_ms)
+        self.clignotement_defaut = Clignotement(self.config.freq_clignotement_defaut_ms)
+        self.clignotement_joueur_touche = Clignotement(
+            self.config.freq_clignotement_joueur_touche_ms
+        )
         
         # Objet utilitaire pour afficher du texte à l'écran.
         self.afficheur_texte = AfficheurTexte(
@@ -132,6 +140,14 @@ class Jeu:
                 self.etat = EtatJeu.EXECUTION
             return
 
+        if (
+            self.etat is EtatJeu.TOUCHE 
+            and self.duree_clignotement_joueur_touche.est_termine()
+        ):
+           self._reprendre_apres_touche()
+           self.etat = EtatJeu.EXECUTION
+
+
         touches = pygame.key.get_pressed()
         direction = DirectionHorizontale.IMMOBILE
 
@@ -145,6 +161,7 @@ class Jeu:
         self.joueur.deplacer(direction)
         self.formation_adversaires.mettre_a_jour()
 
+        # JALON important - Au delà de ce point le traitement n'est que pour le mode EXECUTION
         if self.etat is not EtatJeu.EXECUTION:
             return
 
@@ -167,36 +184,50 @@ class Jeu:
         if nb_adv != 0:
             tireur = random.randint(0, nb_adv - 1)
             if self.tir_adversaires.est_termine():
+                self.sons["projectile_adversaire"].play()
                 self.projectiles_adversaires.append(ProjectileAdversaire(liste_adv[tireur], 
                                                                          self.config))
                 self.tir_adversaires.reinitialiser()
 
-        # Met à jour les projectiles des adversaires
+        # Met à jour les projectiles des adversaires et rebâtit une liste de projectiles avec 
+        # ceux qui ne sont pas sortis
         for pa in self.projectiles_adversaires:
             pa.mettre_a_jour()
-
-        # Rebâtit une liste avec les éléments qui ne sont pas sortis
+        
         self.projectiles_adversaires = [
             pa
             for pa in self.projectiles_adversaires
             if not pa.est_sorti
         ]
 
-        # Vérification si la défaite est proche
-        if (self.etat is EtatJeu.EXECUTION
-            and self.formation_adversaires.verifier_collision(self.rect_defaite_proche)
-        ):
+        # Vérification si on déclanche l'alerte ou la retire.
+        if any(
+            adv.rect.bottom >= self.config.axe_y_avertissement
+            for adv in self.formation_adversaires.adversaires
+        ):        
             self.defaite_imminente = True
-            # Vérification si adversaire a atteint la ligne de défaite, si oui défaite immédiate
-            if self.formation_adversaires.verifier_collision(self.rect_defaite) is not None:
-                self.etat = EtatJeu.DEFAITE
+        else:
+            self.defaite_imminente = False
+            
+        # Vérification si adversaire a atteint la ligne de défaite
+        if any(
+            adv.rect.bottom >= self.config.axe_y_defaite
+            for adv in self.formation_adversaires.adversaires
+        ):        
+            self.etat = EtatJeu.DEFAITE
 
-        # Vérification si collisions avec le joueur
+        # Vérification si un projectile d'un adversaire a atteint le joueur.
         if self._gerer_collisions_joueur() is True:
             self.nombre_vies -= 1
-            self.etat = EtatJeu.DEFAITE if self.nombre_vies <= 0 else EtatJeu.TOUCHE
+            
+            if self.nombre_vies <= 0:
+                self.etat = EtatJeu.DEFAITE
+            else: 
+                self.clignotement_joueur_touche.reinitialiser()
+                self.duree_clignotement_joueur_touche.reinitialiser()
+                self.etat = EtatJeu.TOUCHE
 
-        # Vérfication de la victoire et de la défaite
+        # Si tous les adversaires sont éliminés c'est une victoire.
         if self.formation_adversaires.nombre_adversaires == 0:
             self.etat = EtatJeu.VICTOIRE
             self.vitesse_formation_adversaires += \
@@ -224,7 +255,7 @@ class Jeu:
         self.surface_jeu.blit(self.image_fond, (0, 0))
         temps_actuel = pygame.time.get_ticks()
 
-        if self.etat is not EtatJeu.TOUCHE and self.etat is not EtatJeu.DEFAITE :
+        if self._joueur_doit_etre_dessine(temps_actuel):
             self.joueur.dessiner(self.surface_jeu)
 
         if self.projectile_joueur is not None:
@@ -253,22 +284,9 @@ class Jeu:
                 self.surface_jeu,
                 self.formation_adversaires,
             )
-        elif self.etat is EtatJeu.TOUCHE:
-            rect = self.afficheur_texte.dessiner(
-                "Vaisseau touché!",
-                50,
-                40,
-                self.config.taille_police_titre,
-            )
-            self.afficheur_texte.dessiner(
-                "Appuyez ESPACE pour continuer",
-                50,
-                40,
-                decalage_y_px=rect.height + 10
-            )
         elif self.etat is EtatJeu.VICTOIRE:
             rect = self.afficheur_texte.dessiner(
-                "Bravo! Vous avez vaincu tous les envahisseurs!",
+                "Bravo!",
                 50,
                 40,
                 self.config.taille_police_titre,
@@ -281,7 +299,7 @@ class Jeu:
             )
         elif self.etat is EtatJeu.DEFAITE:
             rect = self.afficheur_texte.dessiner(
-                "La terre a été envahie par les extraterrestres!",
+                "Vous avez perdu!",
                 50,
                 40,
                 self.config.taille_police_titre,
@@ -304,13 +322,21 @@ class Jeu:
         if (
             self.etat is EtatJeu.EXECUTION
             and self.defaite_imminente
-            and self.clignotement_defaut.est_visible(temps_actuel)
         ):
-            pygame.draw.rect(
-                self.surface_jeu,
-                self.config.couleur_axe_defaite,
-                self.rect_defaite,
-            )
+            if self.clignotement_defaut.est_visible(temps_actuel):
+                pygame.draw.line(
+                    self.surface_jeu,
+                    self.config.couleur_axe_defaite,
+                    (self.config.limite_x_min_zone_jouable, self.config.axe_y_defaite),
+                    (self.config.limite_x_max_zone_jouable, self.config.axe_y_defaite),
+                )
+                self.afficheur_texte.dessiner(
+                    "ALERTE : invasion imminente!",
+                    50,
+                    0,
+                    self.config.taille_police_texte,
+                    self.config.couleur_axe_defaite,
+                    self.config.axe_y_defaite - 30)
 
         # Affiche la surface du jeu sans étirement avec des bords noir au besoin
         self.surface_affichage.fill((0, 0, 0))
@@ -333,6 +359,18 @@ class Jeu:
 
         for effet in self.effets_visuels:
             effet.dessiner(self.surface_jeu)
+
+    def _charger_sons(self) -> None:
+        """
+        Chargement de tous les sons du jeux dans un dictionnaire.
+        """
+        
+        self.sons = {
+            "projectile_joueur": pygame.mixer.Sound(self.config.son_projectile_joueur),
+            "projectile_adversaire": pygame.mixer.Sound(self.config.son_projectile_adversaire),
+            "explosion_joueur": pygame.mixer.Sound(self.config.son_explosion_joueur),
+            "explosion_adversaire": pygame.mixer.Sound(self.config.son_explosion_adversaire),
+        }
 
     def _charger_image_fond(self) -> pygame.Surface:
         """
@@ -404,6 +442,19 @@ class Jeu:
         self.projectiles_adversaires = []
         self.touche_tir_precedente = False
 
+    def _joueur_doit_etre_dessine(self, temps_actuel: int) -> bool:
+        """
+        Indique si le joueur doit être dessiné selon l'état courant du jeu.
+        """
+
+        if self.etat is EtatJeu.DEFAITE:
+            return False
+
+        if self.etat is EtatJeu.TOUCHE:
+            return self.clignotement_joueur_touche.est_visible(temps_actuel)
+
+        return True
+    
     def _creer_surface_affichage(self, mode_fenetre: bool) -> tuple[pygame.Surface, pygame.Rect]:
         """
         Crée la surface réelle d'affichage et la zone de rendu du jeu.
@@ -432,9 +483,17 @@ class Jeu:
         if self.projectile_joueur is not None:
             return
 
+        self.sons["projectile_joueur"].play()
+
+        x_centre_projectile = self.joueur.rect.centerx
+        y_haut_projectile = self.joueur.rect.top
+        centre_flash = (x_centre_projectile, y_haut_projectile)
+
+        self.effets_visuels.append(FlashTir(centre_flash, self.config))
+
         self.projectile_joueur = ProjectileJoueur(
-            self.joueur.rect.centerx,
-            self.joueur.rect.top + self.config.hauteur_projectile_joueur,
+            x_centre_projectile,
+            y_haut_projectile,
             self.config,
         )
 
@@ -448,6 +507,7 @@ class Jeu:
 
             if adv is not None:
                 self.effets_visuels.append(Explosion(adv.rect.center, self.config))
+                self.sons["explosion_adversaire"].play()
                 self.formation_adversaires.adversaires.remove(adv)
                 self.projectile_joueur = None
                 self.pointage += self.config.points_par_adversaire
@@ -467,7 +527,12 @@ class Jeu:
             if not self.joueur.verifier_collision(pa.rect)
         ]
 
-        return len(self.projectiles_adversaires) != nb_projectiles_avant
+        collision = False
+        if len(self.projectiles_adversaires) != nb_projectiles_avant:
+            self.sons["explosion_joueur"].play()
+            collision = True
+
+        return collision
 
 if __name__ == "__main__":
     jeu = Jeu()

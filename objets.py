@@ -149,7 +149,7 @@ class FormationAdversaires:
         """
         
         for adv in self.adversaires:
-            rect_reduit = adv.rect.inflate(0, -60)
+            rect_reduit = adv.rect.inflate(0, -30)
             if rect.colliderect(rect_reduit):
                 return adv
 

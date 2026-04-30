@@ -30,9 +30,17 @@ class Configuration:
     image_joueur: str = "assets/images/vaisseau.png"
     image_adversaire: str = "assets/images/soucoupe_volante.png"
 
-    duree_clignotement_defaut_ms: int = 500
+    freq_clignotement_defaut_ms: int = 500
+    freq_clignotement_joueur_touche_ms: int = 120
+    duree_clignotement_joueur_touche_ms: int = 1300
     nb_vies_initiales: int = 3
     points_par_adversaire: int = 100
+
+    # Sons
+    son_projectile_joueur: str = "assets/sons/projectile_joueur.wav"
+    son_projectile_adversaire: str = "assets/sons/projectile_adversaire.wav"
+    son_explosion_joueur: str = "assets/sons/explosion_joueur.wav"
+    son_explosion_adversaire: str = "assets/sons/explosion_adversaire.wav"
 
     # Joueur
     couleur_joueur: tuple[int, int, int] = (80, 220, 255)  # À retirer lorsque sprite
@@ -49,7 +57,7 @@ class Configuration:
     
     largeur_adversaire: int = 64
     hauteur_adversaire: int = 64
-    vitesse_initiale_formation_adversaires: int = 2
+    vitesse_initiale_formation_adversaires: int = 3
     descente_formation_adversaires: int = 16
     increment_vitesse_formation_adversaires: int = 1
     colonnes_adversaires: int = 8
@@ -68,9 +76,11 @@ class Configuration:
     couleur_explosion_interne: tuple[int, int, int] = (255, 127, 0)   
     couleur_explosion_externe: tuple[int, int, int] = (255, 80, 80)
 
-
-#    couleur_explosion_externe: tuple[int, int, int] = (255, 120, 0)
-#    couleur_explosion_interne: tuple[int, int, int] = (255, 230, 80)   
+    duree_flash_tir_ms: int = 40
+    rayon_flash_tir_min: int = 4
+    rayon_flash_tir_max: int = 16
+    couleur_flash_tir_externe: tuple[int, int, int] = (255, 180, 60)
+    couleur_flash_tir_interne: tuple[int, int, int] = (255, 245, 180)    
 
     # Projectile joueur
     couleur_projectile_joueur: tuple[int, int, int] = (255, 127, 0)  # À retirer

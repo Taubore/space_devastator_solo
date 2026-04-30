@@ -4,8 +4,31 @@ Regroupe les effets visuels temporaires du jeu.
 import pygame
 
 from config import Configuration
+from abc import ABC, abstractmethod
 
-class Explosion:
+class EffetVisuel(ABC):
+    """
+    Classe abstraite pour tous les effets visuels
+    """
+
+    def __init__(self, config: Configuration) -> None:
+        """
+        Initialise les informations communes à tous les effets visuels.
+        """
+        
+        self.config = config
+        self.instant_depart = pygame.time.get_ticks()
+        self.est_terminee = False
+
+    @abstractmethod
+    def mettre_a_jour(self) -> None:
+        pass
+
+    @abstractmethod
+    def dessiner(self, surface: pygame.Surface) -> None:
+        pass
+
+class Explosion(EffetVisuel):
     """
     Petite explosion visuelle temporaire.
 
@@ -18,10 +41,8 @@ class Explosion:
         Initialise l'explosion à une position donnée.
         """
 
-        self.config = config
+        super().__init__(config)
         self.centre = centre
-        self.instant_depart = pygame.time.get_ticks()
-        self.est_terminee = False
 
     def mettre_a_jour(self) -> None:
         """
@@ -64,6 +85,65 @@ class Explosion:
         pygame.draw.circle(
             surface,
             self.config.couleur_explosion_interne,
+            self.centre,
+            max(2, rayon // 3),
+        )
+
+class FlashTir(EffetVisuel):
+    """
+    Petit flash visuel affiché au départ du projectile du joueur.
+
+    L'effet est très court : il sert seulement à renforcer la sensation
+    immédiate du tir, sans devenir une animation complexe.
+    """
+
+    def __init__(self, centre: tuple[int, int], config: Configuration) -> None:
+        """
+        Initialise le flash à la position du canon.
+        """
+
+        super().__init__(config)
+        self.centre = centre
+
+    def mettre_a_jour(self) -> None:
+        """
+        Met à jour l'état du flash.
+        """
+
+        temps_ecoule = pygame.time.get_ticks() - self.instant_depart
+
+        if temps_ecoule >= self.config.duree_flash_tir_ms:
+            self.est_terminee = True
+
+    def dessiner(self, surface: pygame.Surface) -> None:
+        """
+        Dessine un flash court qui grossit légèrement avant de disparaître.
+        """
+
+        temps_ecoule = pygame.time.get_ticks() - self.instant_depart
+        progression = temps_ecoule / self.config.duree_flash_tir_ms
+        progression = min(progression, 1.0)
+
+        rayon = int(
+            self.config.rayon_flash_tir_min
+            + (
+                self.config.rayon_flash_tir_max
+                - self.config.rayon_flash_tir_min
+            )
+            * progression
+        )
+
+        pygame.draw.circle(
+            surface,
+            self.config.couleur_flash_tir_externe,
+            self.centre,
+            rayon,
+            width=2,
+        )
+
+        pygame.draw.circle(
+            surface,
+            self.config.couleur_flash_tir_interne,
             self.centre,
             max(2, rayon // 3),
         )

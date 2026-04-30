@@ -68,6 +68,8 @@ class Configuration:
     depart_adversaire_grille_y: int = limite_y_min_zone_jouable
     duree_approche_adversaire_ms: int = 50
     echelle_initiale_approche_adversaires: float = 0.50
+    amplitude_flottement_adversaire: int = 3
+    vitesse_flottement_adversaire: float = 0.004
 
      # Effets visuels
     duree_explosion_adversaire_ms: int = 220

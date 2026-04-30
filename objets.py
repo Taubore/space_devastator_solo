@@ -1,8 +1,9 @@
 """Objets principaux qui composent le jeu."""
 
 import random
-
+import math
 import pygame
+
 from config import Configuration
 from etats import DirectionHorizontale
 
@@ -89,14 +90,21 @@ class Adversaire:
         self.image = pygame.transform.smoothscale(
             self.image,
             (config.largeur_adversaire, config.hauteur_adversaire),
-)
+        )
 
+        self.phase_animation = random.uniform(0, math.tau)
+        
     def dessiner(self, surface: pygame.Surface) -> None:
-        """Dessine un alien avec une forme simple temporaire."""
+        """Dessine l'adversaire avec un léger flottement visuel."""
 
-        #pygame.draw.rect(surface, self.config.couleur_adversaire, self.rect)
-        surface.blit(self.image, self.rect)
+        temps = pygame.time.get_ticks()
+        amplitude = self.config.amplitude_flottement_adversaire
+        vitesse = self.config.vitesse_flottement_adversaire
 
+        decalage_y = math.sin(temps * vitesse + self.phase_animation) * amplitude
+        rect_affichage = self.rect.move(0, round(decalage_y))
+
+        surface.blit(self.image, rect_affichage)
 
 class FormationAdversaires:
     """Gère le déplacement collectif des adversaires."""

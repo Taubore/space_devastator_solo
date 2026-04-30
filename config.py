@@ -61,6 +61,17 @@ class Configuration:
     duree_approche_adversaire_ms: int = 50
     echelle_initiale_approche_adversaires: float = 0.50
 
+     # Effets visuels
+    duree_explosion_adversaire_ms: int = 220
+    rayon_explosion_min: int = 5
+    rayon_explosion_max: int = 40
+    couleur_explosion_interne: tuple[int, int, int] = (255, 127, 0)   
+    couleur_explosion_externe: tuple[int, int, int] = (255, 80, 80)
+
+
+#    couleur_explosion_externe: tuple[int, int, int] = (255, 120, 0)
+#    couleur_explosion_interne: tuple[int, int, int] = (255, 230, 80)   
+
     # Projectile joueur
     couleur_projectile_joueur: tuple[int, int, int] = (255, 127, 0)  # À retirer
 

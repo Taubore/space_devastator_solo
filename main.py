@@ -12,9 +12,9 @@ import pygame
 from config import Configuration
 from etats import EtatJeu, DirectionHorizontale
 from commun import Minuteur, Clignotement, AfficheurTexte
+from effets import Explosion
 from objets import (
     Joueur,
-    Adversaire,
     FormationAdversaires,
     AnimationApprocheAdversaires,
     ProjectileJoueur,
@@ -43,9 +43,7 @@ class Jeu:
         self.surface_jeu = pygame.Surface(
             (self.config.largeur_fenetre, self.config.hauteur_fenetre)
         )
-        self.surface_affichage, self.zone_affichage = (
-            self._creer_surface_affichage(mode_fenetre)
-        )
+        self.surface_affichage, self.zone_affichage = (self._creer_surface_affichage(mode_fenetre))
 
         # On cache le curseur de la souris
         pygame.mouse.set_visible(False)
@@ -55,7 +53,6 @@ class Jeu:
         pygame.display.set_caption(self.config.titre)
 
         self.horloge = pygame.time.Clock()
-        self.etat = EtatJeu.PREPARATION
         self.tir_adversaires = Minuteur(self.config.delai_tir_adversaires_initial, False)
 
         self.joueur = Joueur(self.config)
@@ -63,15 +60,11 @@ class Jeu:
         self.animation_approche_adversaires = AnimationApprocheAdversaires(self.config)
 
         self.projectile_joueur: ProjectileJoueur | None = None
-        self.projectile_adversaire: ProjectileAdversaire| None = None
-        self.clignotement_defaut = Clignotement(
-            self.config.duree_clignotement_defaut_ms
-        )
+        self.projectiles_adversaires: list[ProjectileAdversaire] = []
+        self.effets_visuels: list[Explosion] = []
         
-        self.police_titre = pygame.font.Font(None, self.config.taille_police_titre)
-        self.police_texte = pygame.font.Font(None, self.config.taille_police_texte)
-        self.police_base = pygame.font.Font(None, self.config.taille_police_base)
-
+        self.clignotement_defaut = Clignotement(self.config.duree_clignotement_defaut_ms)
+        
         # Objet utilitaire pour afficher du texte à l'écran.
         self.afficheur_texte = AfficheurTexte(
             self.surface_jeu,
@@ -79,84 +72,24 @@ class Jeu:
             self.config.couleur_texte,
         )
 
-    def _charger_image_fond(self) -> pygame.Surface:
-        """
-        Charge l'image de fond et l'adapte à la surface logique du jeu.
-        """
+        self.etat = EtatJeu.PREPARATION
 
-        image_fond = pygame.image.load(self.config.image_fond_ecran).convert()
-        return pygame.transform.smoothscale(
-            image_fond,
-            (self.config.largeur_fenetre, self.config.hauteur_fenetre),
-        )
-
-    def _initialiser_partie(self) -> None:
+    def executer(self) -> None:
         """
-        Initialise une nouvelle partie
+        Lance la boucle principale du jeu.
         """
 
-        self.nombre_vies = self.config.nb_vies_initiales
-        self.pointage = 0
-        self.vitesse_formation_adversaires = self.config.vitesse_initiale_formation_adversaires
-        self.projectiles_adversaires: list[ProjectileAdversaire] = []
-        self.tir_adversaires.changer_duree(self.config.delai_tir_adversaires_initial)
+        self._demarrer_nouvelle_partie()
 
-        # Faux rectangle (en fait c'est une ligne) qui délimite la zone où si un 
-        # adversaire s'invite, le joueur perd la partie
-        self.rect_defaite = pygame.Rect (
-            self.config.limite_x_min_zone_jouable,
-            self.config.axe_y_defaite,
-            self.config.limite_x_max_zone_jouable - \
-                self.config.limite_x_min_zone_jouable,
-            1,
-        )
+        while self.etat is not EtatJeu.FERMETURE:
+            self._mettre_a_jour()
+            self._dessiner()
+            self._traiter_evenements()
 
-        self.rect_defaite_proche = pygame.Rect(
-            self.config.limite_x_min_zone_jouable,
-            self.config.axe_y_avertissement,
-            self.config.limite_x_max_zone_jouable - \
-                self.config.limite_x_min_zone_jouable,
-            1,
-        )
+            self.horloge.tick(self.config.images_par_seconde)
 
-    def _nouveau_tableau(self) -> None:
-        """
-        Initialise une nouvelle session en début de partie ou après avoir éliminé
-        tous les adversaires.
-        """
-
-        self.touche_tir_precedente = False
-        self.defaite_imminente = False 
-        self.projectile_joueur = None
-        self.projectiles_adversaires = []
-
-        duree_tir = self.config.delai_tir_adversaires_initial + \
-            self.config.increment_delai_tir_adversaires
-        self.tir_adversaires.changer_duree(duree_tir)
-
-        self.clignotement_defaut.reinitialiser()
-        self.formation_adversaires.creer_adversaires(self.vitesse_formation_adversaires)
-        self.animation_approche_adversaires.demarrer(self.formation_adversaires)
-
-    def _creer_surface_affichage(self, mode_fenetre: bool) -> tuple[pygame.Surface, pygame.Rect]:
-        """
-        Crée la surface réelle d'affichage et la zone de rendu du jeu.
-        """
-
-        taille_jeu = (
-            self.config.largeur_fenetre,
-            self.config.hauteur_fenetre,
-        )
-
-        if mode_fenetre:
-            surface_affichage = pygame.display.set_mode(taille_jeu)
-            zone_affichage = surface_affichage.get_rect()
-            return surface_affichage, zone_affichage
-
-        surface_affichage = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
-        zone_affichage = pygame.Rect((0, 0), taille_jeu)
-        zone_affichage.center = surface_affichage.get_rect().center
-        return surface_affichage, zone_affichage
+        pygame.quit()
+        sys.exit()
 
     def _traiter_evenements(self) -> None:
         """
@@ -176,30 +109,27 @@ class Jeu:
                         self.etat is EtatJeu.VICTOIRE
                         or self.etat is EtatJeu.PREPARATION
                     ):
-                        self._nouveau_tableau()
+                        self._demarrer_nouveau_tableau()
                         self.etat = EtatJeu.APPROCHE
                     elif self.etat is EtatJeu.DEFAITE:
-                        self._initialiser_partie()
-                        self._nouveau_tableau()
+                        self._demarrer_nouvelle_partie()
                         self.etat = EtatJeu.APPROCHE
                     elif self.etat is EtatJeu.TOUCHE:
-                        self.projectile_joueur = None
-                        self.projectiles_adversaires = []
-                        self.touche_tir_precedente = False
+                        self._reprendre_apres_touche()
                         self.etat = EtatJeu.EXECUTION
+
 
     def _mettre_a_jour(self) -> None:
         """
         Met à jour la logique du jeu.
         """
         
+        self._mettre_a_jour_effets_visuels()
+
         if self.etat is EtatJeu.APPROCHE:
             if self.animation_approche_adversaires.mettre_a_jour():
                 self.tir_adversaires.reinitialiser()
                 self.etat = EtatJeu.EXECUTION
-            return
-
-        if self.etat is not EtatJeu.EXECUTION:
             return
 
         touches = pygame.key.get_pressed()
@@ -214,6 +144,9 @@ class Jeu:
         # Gestion des déplacements
         self.joueur.deplacer(direction)
         self.formation_adversaires.mettre_a_jour()
+
+        if self.etat is not EtatJeu.EXECUTION:
+            return
 
         # Gestion du bouton de tir
         touche_tir = touches[pygame.K_a]
@@ -269,6 +202,20 @@ class Jeu:
             self.vitesse_formation_adversaires += \
                 self.config.increment_vitesse_formation_adversaires
 
+    def _mettre_a_jour_effets_visuels(self) -> None:
+        """
+        Met à jour les effets visuels temporaires et retire ceux qui sont terminés.
+        """
+
+        for effet in self.effets_visuels:
+            effet.mettre_a_jour()
+
+        self.effets_visuels = [
+            effet
+            for effet in self.effets_visuels
+            if not effet.est_terminee
+        ]
+
     def _dessiner(self) -> None:
         """
         Dessine la scène complète.
@@ -277,31 +224,13 @@ class Jeu:
         self.surface_jeu.blit(self.image_fond, (0, 0))
         temps_actuel = pygame.time.get_ticks()
 
-        if self.etat is EtatJeu.APPROCHE:
-            self.animation_approche_adversaires.dessiner(
-                self.surface_jeu,
-                self.formation_adversaires,
-            )
-        else:
-            self.formation_adversaires.dessiner(self.surface_jeu)
-
         if self.etat is not EtatJeu.TOUCHE and self.etat is not EtatJeu.DEFAITE :
             self.joueur.dessiner(self.surface_jeu)
 
-        # Dessiner l'axe de défaite, il restera affiché jusqu'à une défaite ou victoire.
-        if (
-            self.etat is EtatJeu.EXECUTION
-            and self.defaite_imminente
-            and self.clignotement_defaut.est_visible(temps_actuel)
-        ):
-            pygame.draw.rect(
-                self.surface_jeu,
-                self.config.couleur_axe_defaite,
-                self.rect_defaite,
-            )
-
         if self.projectile_joueur is not None:
             self.projectile_joueur.dessiner(self.surface_jeu)
+
+        self._dessiner_effets_visuels()
 
         for pa in self.projectiles_adversaires:
             pa.dessiner(self.surface_jeu)
@@ -319,17 +248,22 @@ class Jeu:
                 40,
                 decalage_y_px=rect.height + 10
             )
+        elif self.etat is EtatJeu.APPROCHE:
+            self.animation_approche_adversaires.dessiner(
+                self.surface_jeu,
+                self.formation_adversaires,
+            )
         elif self.etat is EtatJeu.TOUCHE:
             rect = self.afficheur_texte.dessiner(
                 "Vaisseau touché!",
                 50,
-                75,
+                40,
                 self.config.taille_police_titre,
             )
             self.afficheur_texte.dessiner(
                 "Appuyez ESPACE pour continuer",
                 50,
-                75,
+                40,
                 decalage_y_px=rect.height + 10
             )
         elif self.etat is EtatJeu.VICTOIRE:
@@ -349,41 +283,146 @@ class Jeu:
             rect = self.afficheur_texte.dessiner(
                 "La terre a été envahie par les extraterrestres!",
                 50,
-                20,
+                40,
                 self.config.taille_police_titre,
             )
             self.afficheur_texte.dessiner(
                 "Appuyez ESPACE pour une nouvelle partie",
                 50,
-                20,
+                40,
                 decalage_y_px=rect.height + 10
             )
+        else:
+            self.formation_adversaires.dessiner(self.surface_jeu)
 
         # Dessine le pointage et les vies
         self.afficheur_texte.dessiner(str(self.pointage), 50, 98, self.config.taille_police_texte)
         texte = f"Vaisseaux : {self.nombre_vies}"
         self.afficheur_texte.dessiner(texte, 98, 98, self.config.taille_police_base)
 
-        self._presenter_image()
+        # Dessiner l'axe de défaite, il restera affiché jusqu'à une défaite ou victoire.
+        if (
+            self.etat is EtatJeu.EXECUTION
+            and self.defaite_imminente
+            and self.clignotement_defaut.est_visible(temps_actuel)
+        ):
+            pygame.draw.rect(
+                self.surface_jeu,
+                self.config.couleur_axe_defaite,
+                self.rect_defaite,
+            )
 
-        pygame.display.flip()
-
-    def _presenter_image(self) -> None:
-        """
-        Affiche l'image du jeu sans étirement, avec bords noirs si besoin.
-        """
-
+        # Affiche la surface du jeu sans étirement avec des bords noir au besoin
         self.surface_affichage.fill((0, 0, 0))
 
         if self.zone_affichage.size == self.surface_jeu.get_size():
             self.surface_affichage.blit(self.surface_jeu, self.zone_affichage)
-            return
+        else:
+            image_redimensionnee = pygame.transform.scale(
+                self.surface_jeu,
+                self.zone_affichage.size,
+            )
+            self.surface_affichage.blit(image_redimensionnee, self.zone_affichage)
 
-        image_redimensionnee = pygame.transform.scale(
-            self.surface_jeu,
-            self.zone_affichage.size,
+        pygame.display.flip()
+
+    def _dessiner_effets_visuels(self) -> None:
+        """
+        Dessine les effets visuels temporaires.
+        """
+
+        for effet in self.effets_visuels:
+            effet.dessiner(self.surface_jeu)
+
+    def _charger_image_fond(self) -> pygame.Surface:
+        """
+        Charge l'image de fond et l'adapte à la surface logique du jeu.
+        """
+
+        image_fond = pygame.image.load(self.config.image_fond_ecran).convert()
+        return pygame.transform.smoothscale(
+            image_fond,
+            (self.config.largeur_fenetre, self.config.hauteur_fenetre),
         )
-        self.surface_affichage.blit(image_redimensionnee, self.zone_affichage)
+
+    def _demarrer_nouvelle_partie(self) -> None:
+        """
+        Démarre une nouvelle partie
+        """
+
+        self.nombre_vies = self.config.nb_vies_initiales
+        self.pointage = 0
+        self.vitesse_formation_adversaires = self.config.vitesse_initiale_formation_adversaires
+        self.tir_adversaires.changer_duree(self.config.delai_tir_adversaires_initial)
+
+        # Faux rectangle (en fait c'est une ligne) qui délimite la zone où si un 
+        # adversaire s'invite, le joueur perd la partie
+        self.rect_defaite = pygame.Rect (
+            self.config.limite_x_min_zone_jouable,
+            self.config.axe_y_defaite,
+            self.config.limite_x_max_zone_jouable - \
+                self.config.limite_x_min_zone_jouable,
+            1,
+        )
+
+        self.rect_defaite_proche = pygame.Rect(
+            self.config.limite_x_min_zone_jouable,
+            self.config.axe_y_avertissement,
+            self.config.limite_x_max_zone_jouable - \
+                self.config.limite_x_min_zone_jouable,
+            1,
+        )
+
+        self._demarrer_nouveau_tableau()
+
+    def _demarrer_nouveau_tableau(self) -> None:
+        """
+        Initialise un nouveau tableau que ce soit pour le début d'une partie ou en cours d'une
+        partie après avoir vaincu un tableau
+        """
+
+        self.touche_tir_precedente = False
+        self.defaite_imminente = False 
+        self.projectile_joueur = None
+        self.projectiles_adversaires = []
+        self.effets_visuels = []
+
+        duree_tir = self.config.delai_tir_adversaires_initial + \
+            self.config.increment_delai_tir_adversaires
+        self.tir_adversaires.changer_duree(duree_tir)
+
+        self.clignotement_defaut.reinitialiser()
+        self.formation_adversaires.creer_adversaires(self.vitesse_formation_adversaires)
+        self.animation_approche_adversaires.demarrer(self.formation_adversaires)
+
+    def _reprendre_apres_touche(self) -> None:
+        """
+        Reprise après avoir été touché par un projectile adversaire.
+        """
+
+        self.projectile_joueur = None
+        self.projectiles_adversaires = []
+        self.touche_tir_precedente = False
+
+    def _creer_surface_affichage(self, mode_fenetre: bool) -> tuple[pygame.Surface, pygame.Rect]:
+        """
+        Crée la surface réelle d'affichage et la zone de rendu du jeu.
+        """
+
+        taille_jeu = (
+            self.config.largeur_fenetre,
+            self.config.hauteur_fenetre,
+        )
+
+        if mode_fenetre:
+            surface_affichage = pygame.display.set_mode(taille_jeu)
+            zone_affichage = surface_affichage.get_rect()
+            return surface_affichage, zone_affichage
+
+        surface_affichage = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
+        zone_affichage = pygame.Rect((0, 0), taille_jeu)
+        zone_affichage.center = surface_affichage.get_rect().center
+        return surface_affichage, zone_affichage
 
     def _tirer_projectile_joueur(self) -> None:
         """
@@ -406,7 +445,9 @@ class Jeu:
         
         if self.projectile_joueur is not None:
             adv = self.formation_adversaires.verifier_collision(self.projectile_joueur.rect)
+
             if adv is not None:
+                self.effets_visuels.append(Explosion(adv.rect.center, self.config))
                 self.formation_adversaires.adversaires.remove(adv)
                 self.projectile_joueur = None
                 self.pointage += self.config.points_par_adversaire
@@ -427,24 +468,6 @@ class Jeu:
         ]
 
         return len(self.projectiles_adversaires) != nb_projectiles_avant
-
-    def executer(self) -> None:
-        """
-        Lance la boucle principale du jeu.
-        """
-
-        self._initialiser_partie()
-
-        while self.etat is not EtatJeu.FERMETURE:
-            self._traiter_evenements()
-            self._mettre_a_jour()
-            self._dessiner()
-
-            self.horloge.tick(self.config.images_par_seconde)
-
-        pygame.quit()
-        sys.exit()
-
 
 if __name__ == "__main__":
     jeu = Jeu()

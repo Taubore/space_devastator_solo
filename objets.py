@@ -64,7 +64,9 @@ class Joueur:
         Vérfie s'il y a collision avec le rectangle passé en paramètre.
         """
         
-        return rect.colliderect(self.rect)
+        rect_reduit = self.rect.inflate(0, -60)
+
+        return rect_reduit.colliderect(rect)
 
 
 class Adversaire:
@@ -147,7 +149,8 @@ class FormationAdversaires:
         """
         
         for adv in self.adversaires:
-            if rect.colliderect(adv.rect):
+            rect_reduit = adv.rect.inflate(0, -60)
+            if rect.colliderect(rect_reduit):
                 return adv
 
         return None

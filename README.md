@@ -1,13 +1,47 @@
-# space_devastator_solo
+# Space Devastator Solo
 
-Projet d'apprentissage Python avec `pygame-ce` pour construire une version
-simple et propre d'un Space Invaders.
+Projet d'apprentissage Python avec `pygame-ce`, inspiré de Space Invaders.
+L'objectif est de construire une première version limitée, propre et lisible
+d'un jeu d'arcade 2D.
+
+## État du projet
+
+Version en cours de développement.
+
+Fonctionnalités présentes :
+
+- boucle principale avec états de jeu ;
+- écran de préparation, victoire et défaite ;
+- déplacement horizontal du joueur ;
+- tir du joueur avec un seul projectile actif ;
+- formation d'adversaires mobile ;
+- tirs adverses ;
+- collisions joueur, adversaires et projectiles ;
+- pointage et nombre de vies ;
+- effets visuels simples ;
+- sons de tir et d'explosion ;
+- affichage plein écran avec surface de rendu logique.
 
 ## Prérequis
 
 - Python `3.12`
-- Environnement virtuel `.venv`
+- environnement virtuel `.venv`
 - `pygame-ce`
+
+## Installation
+
+Créer et activer l'environnement virtuel :
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+```
+
+Installer la dépendance principale :
+
+```bash
+python -m pip install pygame-ce
+```
 
 ## Lancement
 
@@ -19,30 +53,61 @@ python main.py
 
 Depuis VSCode :
 
-- `F5` lance directement `main.py`
-- La configuration de débogage utilise le dossier du projet comme répertoire
-  courant pour éviter les erreurs liées au fichier actif
+- ouvrir le dossier du projet ;
+- utiliser le profil `Python_PyGame_CE` ;
+- lancer avec `F5`.
 
-## Affichage
+La configuration de débogage peut utiliser le dossier du projet comme
+répertoire courant afin d'éviter les erreurs de chargement des assets.
 
-- Le jeu conserve une zone de rendu logique en `1280 x 800` (16:10)
-- Le fond principal est chargé depuis `assets/images/fond_ecran.png`, puis
-  redimensionné une seule fois vers la résolution logique du jeu
-- En fenêtré, la fenêtre utilise directement cette taille
-- En plein écran, l'image du jeu reste centrée sans étirement ; des bords noirs
-  sont affichés autour si la résolution réelle est plus grande
-- Ce contournement remplace `pygame.SCALED`, qui dégradait le rendu du texte et
-  de l'image sur cette configuration
-- Les délais simples du jeu peuvent utiliser l'utilitaire `Minuteur`
-  basé sur `pygame.time.get_ticks()`
-- `Clignotement` reste disponible comme surcouche spécialisée pour les
-  affichages visibles / cachés
-- La durée par défaut `freq_clignotement_defaut_ms = 500` correspond à
-  `500 ms` visible puis `500 ms` masqué
-- Au lancement d'un tableau, les adversaires ont une courte animation
-  d'approche : ils apparaissent un à un, grossissent jusqu'à leur taille
-  normale, puis restent visibles avant le début réel de la partie
-- La vitesse de cette approche est réglée par
-  `duree_approche_adversaire_ms` dans `config.py`
-- Les adversaires arrivent un à un dans un ordre aléatoire ; chaque adversaire
-  passe de petit à sa taille normale avant que le suivant commence
+## Contrôles
+
+- `Flèche gauche` : déplacer le vaisseau vers la gauche
+- `Flèche droite` : déplacer le vaisseau vers la droite
+- `A` : tirer
+- `Espace` : démarrer, continuer ou relancer selon l'état du jeu
+- `Échap` : quitter
+
+## Structure
+
+```text
+.
+├── assets/
+│   ├── images/
+│   └── sons/
+├── commun.py
+├── config.py
+├── effets.py
+├── etats.py
+├── main.py
+├── objets.py
+└── README.md
+```
+
+Rôle des principaux fichiers :
+
+- `main.py` : boucle principale, états du jeu, événements et rendu ;
+- `config.py` : paramètres stables du jeu ;
+- `etats.py` : énumérations des états et directions ;
+- `objets.py` : joueur, adversaires, projectiles et formation ;
+- `effets.py` : effets visuels temporaires ;
+- `commun.py` : utilitaires partagés.
+
+## Notes techniques
+
+Le jeu utilise une surface logique de `1280 x 800` pixels. En mode fenêtré, la
+fenêtre reprend directement cette taille. En plein écran, la surface logique est
+centrée et redimensionnée seulement si nécessaire, avec des bandes noires autour
+si le ratio de l'écran ne correspond pas.
+
+Ce choix remplace l'utilisation directe de `pygame.SCALED`, qui dégradait le
+rendu du texte et de l'image sur la configuration de développement utilisée.
+
+Le fond principal est chargé depuis `assets/images/fond_ecran.png`, puis adapté
+à la résolution logique du jeu. Les chemins d'assets sont relatifs au dossier du
+projet.
+
+## Licence
+
+Projet personnel d'apprentissage. Aucune licence publique n'est définie pour le
+moment.

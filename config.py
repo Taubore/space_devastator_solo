@@ -25,7 +25,7 @@ class Configuration:
     
     couleur_fond: tuple[int, int, int] = (8, 10, 20)
     couleur_texte: tuple[int, int, int] = (230, 230, 230)
-    couleur_axe_defaite : tuple[int, int, int] = (120, 0, 0)
+    couleur_axe_defaite : tuple[int, int, int] = (236, 42, 42)
     image_fond_ecran: str = "assets/images/fond_ecran.png"
     image_joueur: str = "assets/images/vaisseau.png"
     image_adversaire: str = "assets/images/soucoupe_volante.png"
@@ -35,6 +35,14 @@ class Configuration:
     duree_clignotement_joueur_touche_ms: int = 1300
     nb_vies_initiales: int = 3
     points_par_adversaire: int = 100
+
+    # Gestion de la difficulté
+    nb_canaux_tir_initial: int = 2
+    vitesse_initiale_formation_adversaires: int = 3
+    colonnes_adversaires: int = 7
+    lignes_adversaires: int = 3
+    espacement_adversaire_x: int = 54
+    espacement_adversaire_y: int = 10
 
     # Sons
     son_projectile_joueur: str = "assets/sons/projectile_joueur.wav"
@@ -57,13 +65,8 @@ class Configuration:
     
     largeur_adversaire: int = 64
     hauteur_adversaire: int = 64
-    vitesse_initiale_formation_adversaires: int = 3
     descente_formation_adversaires: int = 16
     increment_vitesse_formation_adversaires: int = 1
-    colonnes_adversaires: int = 8
-    lignes_adversaires: int = 3
-    espacement_adversaire_x: int = 54
-    espacement_adversaire_y: int = 40
     depart_adversaire_grille_x: int = 208
     depart_adversaire_grille_y: int = limite_y_min_zone_jouable
     duree_approche_adversaire_ms: int = 50
@@ -93,10 +96,6 @@ class Configuration:
 
     # Projectile adversaires
     couleur_projectile_adversaire: tuple[int, int, int] = (255, 0, 0)  # À retirer
-
     largeur_projectile_adversaire: int = 3
     hauteur_projectile_adversaire: int = 18
     vitesse_projectile_adversaire: int = 6
-
-    delai_tir_adversaires_initial: int = 2500
-    increment_delai_tir_adversaires: int = -500

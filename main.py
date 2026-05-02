@@ -4,7 +4,6 @@ Programme principal du jeu Space Devastator Solo
 
 import os
 import sys
-import random
 
 import pygame
 
@@ -17,7 +16,7 @@ from objets import (
     FormationAdversaires,
     AnimationApprocheAdversaires,
     ProjectileJoueur,
-    ProjectileAdversaire,
+    GestionTirAdversaires,
 )
 
 
@@ -50,12 +49,16 @@ class Jeu:
 
         self.image_fond = self._charger_image_fond()
 
-        self._charger_sons()
+        self.sons = {
+            "projectile_joueur": pygame.mixer.Sound(self.config.son_projectile_joueur),
+            "projectile_adversaire": pygame.mixer.Sound(self.config.son_projectile_adversaire),
+            "explosion_joueur": pygame.mixer.Sound(self.config.son_explosion_joueur),
+            "explosion_adversaire": pygame.mixer.Sound(self.config.son_explosion_adversaire),
+        }
 
         pygame.display.set_caption(self.config.titre)
 
         self.horloge = pygame.time.Clock()
-        self.tir_adversaires = Minuteur(self.config.delai_tir_adversaires_initial, False)
         self.duree_clignotement_joueur_touche = Minuteur(
             self.config.duree_clignotement_joueur_touche_ms, False
             )
@@ -65,14 +68,18 @@ class Jeu:
         self.animation_approche_adversaires = AnimationApprocheAdversaires(self.config)
 
         self.projectile_joueur: ProjectileJoueur | None = None
-        self.projectiles_adversaires: list[ProjectileAdversaire] = []
         self.effets_visuels: list[EffetVisuel] = []
         
         self.clignotement_defaut = Clignotement(self.config.freq_clignotement_defaut_ms)
         self.clignotement_joueur_touche = Clignotement(
             self.config.freq_clignotement_joueur_touche_ms
         )
-        
+
+        self.gestion_tir_adversaires = GestionTirAdversaires(
+            self.sons["projectile_adversaire"],
+            self.config
+        )
+
         # Objet utilitaire pour afficher du texte à l'écran.
         self.afficheur_texte = AfficheurTexte(
             self.surface_jeu,
@@ -117,7 +124,7 @@ class Jeu:
                         self.etat is EtatJeu.VICTOIRE
                         or self.etat is EtatJeu.PREPARATION
                     ):
-                        self._demarrer_nouveau_tableau()
+                        self._demarrer_nouveau_niveau()
                         self.etat = EtatJeu.APPROCHE
                     elif self.etat is EtatJeu.DEFAITE:
                         self._demarrer_nouvelle_partie()
@@ -136,7 +143,6 @@ class Jeu:
 
         if self.etat is EtatJeu.APPROCHE:
             if self.animation_approche_adversaires.mettre_a_jour():
-                self.tir_adversaires.reinitialiser()
                 self.etat = EtatJeu.EXECUTION
             return
 
@@ -178,27 +184,7 @@ class Jeu:
             if self.projectile_joueur is not None and self.projectile_joueur.est_sorti:
                 self.projectile_joueur = None
 
-        # Gestion des projectiles des adversaires
-        liste_adv = self.formation_adversaires.trouver_tireurs_valides()
-        nb_adv = len(liste_adv)
-        if nb_adv != 0:
-            tireur = random.randint(0, nb_adv - 1)
-            if self.tir_adversaires.est_termine():
-                self.sons["projectile_adversaire"].play()
-                self.projectiles_adversaires.append(ProjectileAdversaire(liste_adv[tireur], 
-                                                                         self.config))
-                self.tir_adversaires.reinitialiser()
-
-        # Met à jour les projectiles des adversaires et rebâtit une liste de projectiles avec 
-        # ceux qui ne sont pas sortis
-        for pa in self.projectiles_adversaires:
-            pa.mettre_a_jour()
-        
-        self.projectiles_adversaires = [
-            pa
-            for pa in self.projectiles_adversaires
-            if not pa.est_sorti
-        ]
+        self.gestion_tir_adversaires.mettre_a_jour(self.formation_adversaires)
 
         # Vérification si on déclanche l'alerte ou la retire.
         if any(
@@ -217,7 +203,8 @@ class Jeu:
             self.etat = EtatJeu.DEFAITE
 
         # Vérification si un projectile d'un adversaire a atteint le joueur.
-        if self._gerer_collisions_joueur() is True:
+        if self.gestion_tir_adversaires.verifier_collision(self.joueur) is True:
+            self.sons["explosion_joueur"].play()
             self.nombre_vies -= 1
             
             if self.nombre_vies <= 0:
@@ -230,6 +217,7 @@ class Jeu:
         # Si tous les adversaires sont éliminés c'est une victoire.
         if self.formation_adversaires.nombre_adversaires == 0:
             self.etat = EtatJeu.VICTOIRE
+            self.niveau += 1
             self.vitesse_formation_adversaires += \
                 self.config.increment_vitesse_formation_adversaires
 
@@ -263,8 +251,7 @@ class Jeu:
 
         self._dessiner_effets_visuels()
 
-        for pa in self.projectiles_adversaires:
-            pa.dessiner(self.surface_jeu)
+        self.gestion_tir_adversaires.dessiner(self.surface_jeu)
 
         if self.etat is EtatJeu.PREPARATION:
             rect = self.afficheur_texte.dessiner(
@@ -314,9 +301,12 @@ class Jeu:
             self.formation_adversaires.dessiner(self.surface_jeu)
 
         # Dessine le pointage et les vies
-        self.afficheur_texte.dessiner(str(self.pointage), 50, 98, self.config.taille_police_texte)
-        texte = f"Vaisseaux : {self.nombre_vies}"
-        self.afficheur_texte.dessiner(texte, 98, 98, self.config.taille_police_base)
+        texte = f"Niveau {str(self.niveau)}"
+        self.afficheur_texte.dessiner(texte, 2, 2, self.config.taille_police_base)
+        texte = f"= {str(self.pointage)} ="
+        self.afficheur_texte.dessiner(texte, 50, 2, self.config.taille_police_texte)
+        texte = f"Vaisseaux: {self.nombre_vies}"
+        self.afficheur_texte.dessiner(texte, 98, 2, self.config.taille_police_base)
 
         # Dessiner l'axe de défaite, il restera affiché jusqu'à une défaite ou victoire.
         if (
@@ -360,18 +350,6 @@ class Jeu:
         for effet in self.effets_visuels:
             effet.dessiner(self.surface_jeu)
 
-    def _charger_sons(self) -> None:
-        """
-        Chargement de tous les sons du jeux dans un dictionnaire.
-        """
-        
-        self.sons = {
-            "projectile_joueur": pygame.mixer.Sound(self.config.son_projectile_joueur),
-            "projectile_adversaire": pygame.mixer.Sound(self.config.son_projectile_adversaire),
-            "explosion_joueur": pygame.mixer.Sound(self.config.son_explosion_joueur),
-            "explosion_adversaire": pygame.mixer.Sound(self.config.son_explosion_adversaire),
-        }
-
     def _charger_image_fond(self) -> pygame.Surface:
         """
         Charge l'image de fond et l'adapte à la surface logique du jeu.
@@ -390,8 +368,8 @@ class Jeu:
 
         self.nombre_vies = self.config.nb_vies_initiales
         self.pointage = 0
+        self.niveau = 1
         self.vitesse_formation_adversaires = self.config.vitesse_initiale_formation_adversaires
-        self.tir_adversaires.changer_duree(self.config.delai_tir_adversaires_initial)
 
         # Faux rectangle (en fait c'est une ligne) qui délimite la zone où si un 
         # adversaire s'invite, le joueur perd la partie
@@ -411,23 +389,20 @@ class Jeu:
             1,
         )
 
-        self._demarrer_nouveau_tableau()
+        self._demarrer_nouveau_niveau()
 
-    def _demarrer_nouveau_tableau(self) -> None:
+    def _demarrer_nouveau_niveau(self) -> None:
         """
-        Initialise un nouveau tableau que ce soit pour le début d'une partie ou en cours d'une
-        partie après avoir vaincu un tableau
+        Initialise un nouveau niveau que ce soit pour le début d'une partie ou en cours d'une
+        partie après avoir vaincu un niveau
         """
 
         self.touche_tir_precedente = False
         self.defaite_imminente = False 
         self.projectile_joueur = None
-        self.projectiles_adversaires = []
-        self.effets_visuels = []
+        self.effets_visuels.clear()
 
-        duree_tir = self.config.delai_tir_adversaires_initial + \
-            self.config.increment_delai_tir_adversaires
-        self.tir_adversaires.changer_duree(duree_tir)
+        self.gestion_tir_adversaires.initialiser(self.config.nb_canaux_tir_initial)
 
         self.clignotement_defaut.reinitialiser()
         self.formation_adversaires.creer_adversaires(self.vitesse_formation_adversaires)
@@ -439,7 +414,7 @@ class Jeu:
         """
 
         self.projectile_joueur = None
-        self.projectiles_adversaires = []
+        self.gestion_tir_adversaires.initialiser(self.config.nb_canaux_tir_initial)
         self.touche_tir_precedente = False
 
     def _joueur_doit_etre_dessine(self, temps_actuel: int) -> bool:
@@ -511,28 +486,6 @@ class Jeu:
                 self.formation_adversaires.adversaires.remove(adv)
                 self.projectile_joueur = None
                 self.pointage += self.config.points_par_adversaire
-
-    def _gerer_collisions_joueur(self) -> bool:
-        """
-        Gère les collisions des projectiles adversaire avec le joueur. 
-        S'assure de retirer le projectile de la liste s'il y a collision.
-        Retour : true si collision.
-        """
-
-        nb_projectiles_avant = len(self.projectiles_adversaires)
-
-        self.projectiles_adversaires = [
-            pa
-            for pa in self.projectiles_adversaires
-            if not self.joueur.verifier_collision(pa.rect)
-        ]
-
-        collision = False
-        if len(self.projectiles_adversaires) != nb_projectiles_avant:
-            self.sons["explosion_joueur"].play()
-            collision = True
-
-        return collision
 
 if __name__ == "__main__":
     jeu = Jeu()

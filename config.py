@@ -36,14 +36,6 @@ class Configuration:
     nb_vies_initiales: int = 3
     points_par_adversaire: int = 100
 
-    # Gestion de la difficulté
-    nb_canaux_tir_initial: int = 2
-    vitesse_initiale_formation_adversaires: int = 3
-    colonnes_adversaires: int = 7
-    lignes_adversaires: int = 3
-    espacement_adversaire_x: int = 54
-    espacement_adversaire_y: int = 10
-
     # Sons
     son_projectile_joueur: str = "assets/sons/projectile_joueur.wav"
     son_projectile_adversaire: str = "assets/sons/projectile_adversaire.wav"

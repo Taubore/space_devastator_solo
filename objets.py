@@ -173,7 +173,13 @@ class FormationAdversaires:
         
         return len(self.adversaires)
 
-    def creer_adversaires(self, vitesse: int) -> None:
+    def creer_adversaires(self,
+                          vitesse: int,
+                          nb_colonnes: int,
+                          nb_lignes: int,
+                          espacement_x: int,
+                          espacement_y: int,
+        )-> None:
         """
         Initialise tous les adversaires à partir des infos de la configuration.
         """
@@ -184,15 +190,15 @@ class FormationAdversaires:
 
         pas_x = (
             self.config.largeur_adversaire
-            + self.config.espacement_adversaire_x
+            + espacement_x
         )
         pas_y = (
             self.config.hauteur_adversaire
-            + self.config.espacement_adversaire_y
+            + espacement_y
         )
 
-        for lig in range(self.config.lignes_adversaires):
-            for col in range(self.config.colonnes_adversaires):
+        for lig in range(nb_lignes):
+            for col in range(nb_colonnes):
                 x = self.config.depart_adversaire_grille_x + col * pas_x
                 y = self.config.depart_adversaire_grille_y + lig * pas_y
                 self.adversaires.append(Adversaire(x, y, self.config))

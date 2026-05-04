@@ -4,8 +4,9 @@ Programme principal du jeu Space Devastator Solo
 
 import os
 import sys
-
 import pygame
+
+import niveaux
 
 from config import Configuration
 from etats import EtatJeu, DirectionHorizontale
@@ -86,6 +87,8 @@ class Jeu:
             self.config.taille_police_texte,
             self.config.couleur_texte,
         )
+
+        self.gestionnaire_niveaux = niveaux.GestionnaireNiveaux(niveaux.NIVEAUX)
 
         self.etat = EtatJeu.PREPARATION
 
@@ -212,14 +215,18 @@ class Jeu:
             else: 
                 self.clignotement_joueur_touche.reinitialiser()
                 self.duree_clignotement_joueur_touche.reinitialiser()
+                self.projectile_joueur = None
+                self.gestion_tir_adversaires.projectiles.clear()
+                self.effets_visuels.clear()
                 self.etat = EtatJeu.TOUCHE
 
         # Si tous les adversaires sont éliminés c'est une victoire.
         if self.formation_adversaires.nombre_adversaires == 0:
+            self.projectile_joueur = None
+            self.gestion_tir_adversaires.projectiles.clear()
+            self.effets_visuels.clear()
             self.etat = EtatJeu.VICTOIRE
-            self.niveau += 1
-            self.vitesse_formation_adversaires += \
-                self.config.increment_vitesse_formation_adversaires
+            self.gestionnaire_niveaux.passer_au_niveau_suivant()
 
     def _mettre_a_jour_effets_visuels(self) -> None:
         """
@@ -301,7 +308,7 @@ class Jeu:
             self.formation_adversaires.dessiner(self.surface_jeu)
 
         # Dessine le pointage et les vies
-        texte = f"Niveau {str(self.niveau)}"
+        texte = f"Niveau {str(self.gestionnaire_niveaux.niveau_courant.numero)}"
         self.afficheur_texte.dessiner(texte, 2, 2, self.config.taille_police_base)
         texte = f"= {str(self.pointage)} ="
         self.afficheur_texte.dessiner(texte, 50, 2, self.config.taille_police_texte)
@@ -368,8 +375,7 @@ class Jeu:
 
         self.nombre_vies = self.config.nb_vies_initiales
         self.pointage = 0
-        self.niveau = 1
-        self.vitesse_formation_adversaires = self.config.vitesse_initiale_formation_adversaires
+        self.gestionnaire_niveaux.recommencer()
 
         # Faux rectangle (en fait c'est une ligne) qui délimite la zone où si un 
         # adversaire s'invite, le joueur perd la partie
@@ -401,11 +407,21 @@ class Jeu:
         self.defaite_imminente = False 
         self.projectile_joueur = None
         self.effets_visuels.clear()
-
-        self.gestion_tir_adversaires.initialiser(self.config.nb_canaux_tir_initial)
-
         self.clignotement_defaut.reinitialiser()
-        self.formation_adversaires.creer_adversaires(self.vitesse_formation_adversaires)
+
+        # On obtiens un ParametresNiveau dans la liste selon le niveau courant puis on initialise
+        # nos différents objets à partir de ces paramètres
+        params = self.gestionnaire_niveaux.niveau_courant
+        self.gestion_tir_adversaires.initialiser(params.nb_canaux_tir)
+        self.formation_adversaires.creer_adversaires(
+            params.vitesse_formation_adversaires,
+            params.colonnes_adversaires,
+            params.lignes_adversaires,
+            params.espacement_adversaire_x,
+            params.espacement_adversaire_y,
+        )
+
+        # On joue l'animation de début de niveau
         self.animation_approche_adversaires.demarrer(self.formation_adversaires)
 
     def _reprendre_apres_touche(self) -> None:
@@ -414,7 +430,9 @@ class Jeu:
         """
 
         self.projectile_joueur = None
-        self.gestion_tir_adversaires.initialiser(self.config.nb_canaux_tir_initial)
+        self.gestion_tir_adversaires.initialiser(
+            self.gestionnaire_niveaux.niveau_courant.nb_canaux_tir
+        )
         self.touche_tir_precedente = False
 
     def _joueur_doit_etre_dessine(self, temps_actuel: int) -> bool:

@@ -27,8 +27,14 @@ class Configuration:
     couleur_texte: tuple[int, int, int] = (230, 230, 230)
     couleur_axe_defaite : tuple[int, int, int] = (236, 42, 42)
     image_fond_ecran: str = "assets/images/fond_ecran.png"
-    image_joueur: str = "assets/images/vaisseau.png"
-    image_adversaire: str = "assets/images/soucoupe_volante.png"
+    image_joueur: str = "assets/images/vaisseau3.png"
+    image_adversaires: tuple[str, str, str, str] = (
+        "assets/images/soucoupe_volante_verte.png",
+        "assets/images/soucoupe_volante_bleue.png",
+        "assets/images/soucoupe_volante_rouge.png",
+        "assets/images/soucoupe_volante_jaune.png",
+    )
+         
 
     freq_clignotement_defaut_ms: int = 500
     freq_clignotement_joueur_touche_ms: int = 120
@@ -41,6 +47,7 @@ class Configuration:
     son_projectile_adversaire: str = "assets/sons/projectile_adversaire.wav"
     son_explosion_joueur: str = "assets/sons/explosion_joueur.wav"
     son_explosion_adversaire: str = "assets/sons/explosion_adversaire.wav"
+    son_adversaire_bonus: str = "assets/sons/adversaire_bonus.wav"
 
     # Joueur
     couleur_joueur: tuple[int, int, int] = (80, 220, 255)  # À retirer lorsque sprite

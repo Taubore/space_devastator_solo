@@ -120,7 +120,7 @@ class ProjectileJoueur:
 class Adversaire:
     """Adversaire individuel dans la grille."""
 
-    def __init__(self, x: int, y: int, config: Configuration) -> None:
+    def __init__(self, x: int, y: int, niveau: int, config: Configuration) -> None:
         """
         Constructeur
         """
@@ -133,7 +133,7 @@ class Adversaire:
             config.hauteur_adversaire,
         )
 
-        self.image = pygame.image.load(config.image_adversaire).convert_alpha()
+        self.image = pygame.image.load(config.image_adversaires[niveau]).convert_alpha()
         self.image = pygame.transform.smoothscale(
             self.image,
             (config.largeur_adversaire, config.hauteur_adversaire),
@@ -201,7 +201,7 @@ class FormationAdversaires:
             for col in range(nb_colonnes):
                 x = self.config.depart_adversaire_grille_x + col * pas_x
                 y = self.config.depart_adversaire_grille_y + lig * pas_y
-                self.adversaires.append(Adversaire(x, y, self.config))
+                self.adversaires.append(Adversaire(x, y, lig, self.config))
 
     def verifier_collision(self, rect: pygame.Rect) -> Adversaire | None:
         """

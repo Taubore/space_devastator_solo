@@ -120,6 +120,8 @@ class ProjectileJoueur:
 class Adversaire:
     """Adversaire individuel dans la grille."""
 
+    VALEUR_POINTAGE = [100, 250, 500, 500] 
+
     def __init__(self, x: int, y: int, niveau: int, config: Configuration) -> None:
         """
         Constructeur
@@ -140,6 +142,7 @@ class Adversaire:
         )
 
         self.phase_animation = random.uniform(0, math.tau)
+        self.niveau_adv = niveau
         
     def dessiner(self, surface: pygame.Surface) -> None:
         """Dessine l'adversaire avec un léger flottement visuel."""
@@ -152,6 +155,14 @@ class Adversaire:
         rect_affichage = self.rect.move(0, round(decalage_y))
 
         surface.blit(self.image, rect_affichage)
+
+    @property
+    def ValeurPointage(self) -> int:
+        """
+        Retourne la valeur en point de l'adversaire.
+        """
+        return (self.VALEUR_POINTAGE[self.niveau_adv])
+
 
 class FormationAdversaires:
     """Gère le déplacement collectif des adversaires."""
@@ -197,11 +208,14 @@ class FormationAdversaires:
             + espacement_y
         )
 
+        niveau_adv = nb_lignes - 1
+
         for lig in range(nb_lignes):
             for col in range(nb_colonnes):
                 x = self.config.depart_adversaire_grille_x + col * pas_x
                 y = self.config.depart_adversaire_grille_y + lig * pas_y
-                self.adversaires.append(Adversaire(x, y, lig, self.config))
+                self.adversaires.append(Adversaire(x, y, niveau_adv, self.config))
+            niveau_adv -= 1
 
     def verifier_collision(self, rect: pygame.Rect) -> Adversaire | None:
         """

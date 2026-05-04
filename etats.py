@@ -10,7 +10,8 @@ class EtatJeu(Enum):
     APPROCHE = auto()
     EXECUTION = auto()
     FERMETURE = auto()
-    VICTOIRE = auto()
+    VICTOIRE_NIVEAU = auto()
+    VICTOIRE_FINALE = auto()
     DEFAITE = auto()
     TOUCHE = auto()
 

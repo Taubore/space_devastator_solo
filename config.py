@@ -19,12 +19,14 @@ class Configuration:
     limite_y_max_zone_jouable: int = hauteur_fenetre - limite_y_min_zone_jouable
 
     titre: str = "Space Devastator solo"
-    taille_police_titre: int = 50
+    taille_police_titre: int = 44
     taille_police_texte: int = 22
-    taille_police_base: int = 18
+    taille_police_base: int = 22
     
     couleur_fond: tuple[int, int, int] = (8, 10, 20)
-    couleur_texte: tuple[int, int, int] = (230, 230, 230)
+    couleur_texte: tuple[int, int, int] = (204, 229, 255)
+    couleur_pointage: tuple[int, int, int] = (51, 153, 255)
+    couleur_pointage_record: tuple[int, int, int] = (255, 51, 51)    
     couleur_axe_defaite : tuple[int, int, int] = (236, 42, 42)
     image_fond_ecran: str = "assets/images/fond_ecran.png"
     image_joueur: str = "assets/images/vaisseau3.png"
@@ -32,7 +34,7 @@ class Configuration:
         "assets/images/soucoupe_volante_verte.png",
         "assets/images/soucoupe_volante_bleue.png",
         "assets/images/soucoupe_volante_rouge.png",
-        "assets/images/soucoupe_volante_jaune.png",
+        "assets/images/soucoupe_volante_rouge.png",
     )
          
 

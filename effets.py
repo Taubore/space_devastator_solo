@@ -5,6 +5,7 @@ import pygame
 
 from config import Configuration
 from abc import ABC, abstractmethod
+from commun import AfficheurTexte
 
 class EffetVisuel(ABC):
     """
@@ -36,13 +37,14 @@ class Explosion(EffetVisuel):
     rapidement, puis l'objet se marque comme terminé.
     """
 
-    def __init__(self, centre: tuple[int, int], config: Configuration) -> None:
+    def __init__(self, centre: tuple[int, int], pointage: int, config: Configuration) -> None:
         """
         Initialise l'explosion à une position donnée.
         """
 
         super().__init__(config)
         self.centre = centre
+        self.pointage = pointage
 
     def mettre_a_jour(self) -> None:
         """
@@ -62,6 +64,12 @@ class Explosion(EffetVisuel):
         temps_ecoule = pygame.time.get_ticks() - self.instant_depart
         progression = temps_ecoule / self.config.duree_explosion_adversaire_ms
         progression = min(progression, 1.0)
+
+        # On affiche le pointage selon le type d'adversaire
+        police = pygame.font.Font(None, 16)
+        surface_txt = police.render(str(self.pointage), True, self.config.couleur_texte)
+        pos = self.centre[0]-20, self.centre[1]-30
+        surface.blit(surface_txt, pos)
 
         rayon = int(
             self.config.rayon_explosion_min

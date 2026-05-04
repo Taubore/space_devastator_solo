@@ -8,6 +8,9 @@ import pygame
 
 import niveaux
 
+from configparser import ConfigParser
+from pathlib import Path
+
 from config import Configuration
 from etats import EtatJeu, DirectionHorizontale
 from commun import Minuteur, Clignotement, AfficheurTexte
@@ -34,7 +37,11 @@ class Jeu:
         pygame.init()
         pygame.mixer.init()
 
+        # Configuration initiale du jeu
         self.config = Configuration()
+        self.rep_config = Path("sds.cfg")
+        self.fichier_config = self._charger_fichier_config()
+        self.pointage_record = self.fichier_config.getint("pointage", "record", fallback=0)
 
         # Récupération du paramètre dans launch.json pour afficher en mode fenêtré
         # ou non. Utile pour le déboguage.
@@ -49,6 +56,7 @@ class Jeu:
         pygame.mouse.set_visible(False)
 
         self.image_fond = self._charger_image_fond()
+        self.image_vie = self._charger_image_vie()
 
         self.sons = {
             "projectile_joueur": pygame.mixer.Sound(self.config.son_projectile_joueur),
@@ -106,6 +114,8 @@ class Jeu:
 
             self.horloge.tick(self.config.images_par_seconde)
 
+        self.fichier_config["pointage"]["record"] = str(self.pointage_record)        
+        self._enregistrer_fichier_config()
         pygame.quit()
         sys.exit()
 
@@ -124,12 +134,15 @@ class Jeu:
 
                 if evenement.key == pygame.K_SPACE:
                     if (
-                        self.etat is EtatJeu.VICTOIRE
+                        self.etat is EtatJeu.VICTOIRE_NIVEAU
                         or self.etat is EtatJeu.PREPARATION
                     ):
                         self._demarrer_nouveau_niveau()
                         self.etat = EtatJeu.APPROCHE
-                    elif self.etat is EtatJeu.DEFAITE:
+                    elif (
+                        self.etat is EtatJeu.DEFAITE
+                        or self.etat is EtatJeu.VICTOIRE_FINALE
+                    ):
                         self._demarrer_nouvelle_partie()
                         self.etat = EtatJeu.APPROCHE
                     elif self.etat is EtatJeu.TOUCHE:
@@ -185,6 +198,7 @@ class Jeu:
             self.projectile_joueur.mettre_a_jour()
             self._gerer_collisions_adversaires()
             if self.projectile_joueur is not None and self.projectile_joueur.est_sorti:
+                self.pointage = self.pointage - 100 if self.pointage > 0 else self.pointage
                 self.projectile_joueur = None
 
         self.gestion_tir_adversaires.mettre_a_jour(self.formation_adversaires)
@@ -225,9 +239,16 @@ class Jeu:
             self.projectile_joueur = None
             self.gestion_tir_adversaires.projectiles.clear()
             self.effets_visuels.clear()
-            self.etat = EtatJeu.VICTOIRE
-            self.gestionnaire_niveaux.passer_au_niveau_suivant()
+            if self.gestionnaire_niveaux.passer_au_niveau_suivant():
+                self.etat = EtatJeu.VICTOIRE_NIVEAU
+            else:
+                self.etat = EtatJeu.VICTOIRE_FINALE
 
+        # Si le pointage courant est supérieur au pointage record
+        if self.pointage > self.pointage_record:
+            self.pointage_record = self.pointage
+            self.couleur_pointage = self.config.couleur_pointage_record
+                
     def _mettre_a_jour_effets_visuels(self) -> None:
         """
         Met à jour les effets visuels temporaires et retire ceux qui sont terminés.
@@ -278,9 +299,9 @@ class Jeu:
                 self.surface_jeu,
                 self.formation_adversaires,
             )
-        elif self.etat is EtatJeu.VICTOIRE:
+        elif self.etat is EtatJeu.VICTOIRE_NIVEAU:
             rect = self.afficheur_texte.dessiner(
-                "Bravo!",
+                "Préparez-vous...",
                 50,
                 40,
                 self.config.taille_police_titre,
@@ -291,9 +312,22 @@ class Jeu:
                 40,
                 decalage_y_px=rect.height + 10
             )
+        elif self.etat is EtatJeu.VICTOIRE_FINALE:
+            rect = self.afficheur_texte.dessiner(
+                "Bravo! Vous avez réussi à repousser tous les envahisseurs!",
+                50,
+                40,
+                self.config.taille_police_titre,
+            )
+            self.afficheur_texte.dessiner(
+                "Appuyez ESPACE pour une nouvelle partie",
+                50,
+                40,
+                decalage_y_px=rect.height + 10
+            )
         elif self.etat is EtatJeu.DEFAITE:
             rect = self.afficheur_texte.dessiner(
-                "Vous avez perdu!",
+                "Les envahisseurs se sont emparés de la Terre!",
                 50,
                 40,
                 self.config.taille_police_titre,
@@ -308,12 +342,29 @@ class Jeu:
             self.formation_adversaires.dessiner(self.surface_jeu)
 
         # Dessine le pointage et les vies
+        texte = f"{str(self.pointage)}"
+        self.afficheur_texte.dessiner(
+            texte, 2, 2, self.config.taille_police_texte, self.config.couleur_pointage)
+        
+        texte = f"Record: {str(self.pointage_record)}"
+        self.afficheur_texte.dessiner(
+            texte, 98, 2, self.config.taille_police_texte, self.couleur_pointage)
+        
         texte = f"Niveau {str(self.gestionnaire_niveaux.niveau_courant.numero)}"
-        self.afficheur_texte.dessiner(texte, 2, 2, self.config.taille_police_base)
-        texte = f"= {str(self.pointage)} ="
-        self.afficheur_texte.dessiner(texte, 50, 2, self.config.taille_police_texte)
-        texte = f"Vaisseaux: {self.nombre_vies}"
-        self.afficheur_texte.dessiner(texte, 98, 2, self.config.taille_police_base)
+        self.afficheur_texte.dessiner(texte, 2, 98, self.config.taille_police_base)
+        
+        # Affiche des minis vaisseaux pour chaque vie
+        position_x_vies = round(self.surface_jeu.get_width() * 98 / 100)
+        position_y_vies = round(self.surface_jeu.get_height() * 98 / 100)
+        largeur_vie = self.image_vie.get_width()
+        espacement_vies = 6
+
+        for index_vie in range(self.nombre_vies):
+            decalage_x = index_vie * (largeur_vie + espacement_vies)
+            rect_image_vie = self.image_vie.get_rect(
+                bottomright=(position_x_vies - decalage_x, position_y_vies)
+            )
+            self.surface_jeu.blit(self.image_vie, rect_image_vie)
 
         # Dessiner l'axe de défaite, il restera affiché jusqu'à une défaite ou victoire.
         if (
@@ -368,6 +419,14 @@ class Jeu:
             (self.config.largeur_fenetre, self.config.hauteur_fenetre),
         )
 
+    def _charger_image_vie(self) -> pygame.Surface:
+        """
+        Charge l'icône du joueur affichée à côté du nombre de vies.
+        """
+
+        image_vie = pygame.image.load(self.config.image_joueur).convert_alpha()
+        return pygame.transform.smoothscale(image_vie, (32, 32))
+
     def _demarrer_nouvelle_partie(self) -> None:
         """
         Démarre une nouvelle partie
@@ -375,6 +434,7 @@ class Jeu:
 
         self.nombre_vies = self.config.nb_vies_initiales
         self.pointage = 0
+        self.couleur_pointage = self.config.couleur_pointage
         self.gestionnaire_niveaux.recommencer()
 
         # Faux rectangle (en fait c'est une ligne) qui délimite la zone où si un 
@@ -499,11 +559,37 @@ class Jeu:
             adv = self.formation_adversaires.verifier_collision(self.projectile_joueur.rect)
 
             if adv is not None:
-                self.effets_visuels.append(Explosion(adv.rect.center, self.config))
+                self.effets_visuels.append(
+                    Explosion(adv.rect.center, adv.ValeurPointage, self.config)
+                )
                 self.sons["explosion_adversaire"].play()
                 self.formation_adversaires.adversaires.remove(adv)
                 self.projectile_joueur = None
-                self.pointage += self.config.points_par_adversaire
+                self.pointage += adv.ValeurPointage
+
+    def _charger_fichier_config(self) -> ConfigParser:
+        """
+        Charge la configuration sauvegardée du jeu.
+        """
+
+        config_sds = ConfigParser()
+        config_sds.read(self.rep_config, encoding="utf-8")
+
+        if not config_sds.has_section("pointage"):
+            config_sds["pointage"] = {}
+
+        if "record" not in config_sds["pointage"]:
+            config_sds["pointage"]["record"] = "0"
+
+        return config_sds
+
+    def _enregistrer_fichier_config(self) -> None:
+        """
+        Enregistre la configuration sauvegardée du jeu.
+        """
+
+        with self.rep_config.open("w", encoding="utf-8") as fichier:
+            self.fichier_config.write(fichier)
 
 if __name__ == "__main__":
     jeu = Jeu()

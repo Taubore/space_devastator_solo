@@ -27,6 +27,7 @@ class Configuration:
     couleur_texte: tuple[int, int, int] = (204, 229, 255)
     couleur_pointage: tuple[int, int, int] = (51, 153, 255)
     couleur_pointage_record: tuple[int, int, int] = (255, 51, 51)    
+    couleur_bonus: tuple[int, int, int] = (255, 210, 80)
     couleur_axe_defaite : tuple[int, int, int] = (236, 42, 42)
     image_fond_ecran: str = "assets/images/fond_ecran.png"
     image_joueur: str = "assets/images/vaisseau3.png"
@@ -43,6 +44,12 @@ class Configuration:
     duree_clignotement_joueur_touche_ms: int = 1300
     nb_vies_initiales: int = 3
     points_par_adversaire: int = 100
+    points_bonus_vie_par_niveau: int = 500
+    duree_animation_bonus_ms: int = 1800
+    tranche_son_bonus: int = 100
+    frequence_son_bonus_depart: int = 440
+    increment_frequence_son_bonus: int = 18
+    duree_son_bonus_ms: int = 35
 
     # Sons
     son_projectile_joueur: str = "assets/sons/projectile_joueur.wav"

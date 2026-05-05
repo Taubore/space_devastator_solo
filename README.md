@@ -17,7 +17,7 @@ Fonctionnalités présentes :
 - formation d'adversaires mobile ;
 - tirs adverses ;
 - collisions joueur, adversaires et projectiles ;
-- pointage et nombre de vies ;
+- pointage, nombre de vies et bonus de victoire ;
 - effets visuels simples ;
 - sons de tir et d'explosion ;
 - affichage plein écran avec surface de rendu logique.
@@ -67,6 +67,22 @@ répertoire courant afin d'éviter les erreurs de chargement des assets.
 - `A` : tirer
 - `Espace` : démarrer, continuer ou relancer selon l'état du jeu
 - `Échap` : quitter
+
+## Pointage
+
+Les adversaires rapportent des points selon leur type. Un projectile du joueur
+qui sort de l'écran sans toucher d'adversaire retire `100` points si le pointage
+est positif.
+
+Après une victoire de niveau ou une victoire finale, un bonus est ajouté au
+pointage :
+
+```text
+vies restantes x 500 x niveau terminé
+```
+
+Le total est affiché avec une courte animation de comptage et un son montant par
+tranche de points.
 
 ## Structure
 

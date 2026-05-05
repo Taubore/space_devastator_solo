@@ -420,9 +420,8 @@ class GestionTirAdversaires:
     Permet de gérer les tirs de projectiles des adversaires.
     """
 
-    VITESSE_TIR_INITIAL_MIN = 2500
-    VITESSE_TIR_INITIAL_MAX = 3500
-    INCREMENT_VITESSE_TIR = -500
+    VITESSE_TIR_INITIAL_MIN = 2000
+    VITESSE_TIR_INITIAL_MAX = 6000
 
     def __init__(self, son: pygame.mixer.Sound, config: Configuration) -> None:
         """

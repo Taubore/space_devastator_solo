@@ -2,12 +2,14 @@
 Programme principal du jeu Space Devastator Solo
 """
 
+import math
 import os
 import sys
 import pygame
 
 import niveaux
 
+from array import array
 from configparser import ConfigParser
 from pathlib import Path
 
@@ -64,6 +66,7 @@ class Jeu:
             "explosion_joueur": pygame.mixer.Sound(self.config.son_explosion_joueur),
             "explosion_adversaire": pygame.mixer.Sound(self.config.son_explosion_adversaire),
         }
+        self.sons_bonus: dict[int, pygame.mixer.Sound] = {}
 
         pygame.display.set_caption(self.config.titre)
 
@@ -97,6 +100,13 @@ class Jeu:
         )
 
         self.gestionnaire_niveaux = niveaux.GestionnaireNiveaux(niveaux.NIVEAUX)
+        self.niveau_victoire = 0
+        self.bonus_victoire = 0
+        self.pointage_depart_bonus = 0
+        self.pointage_cible_bonus = 0
+        self.instant_depart_bonus = 0
+        self.prochaine_tranche_son_bonus = 0
+        self.animation_bonus_terminee = True
 
         self.etat = EtatJeu.PREPARATION
 
@@ -137,12 +147,16 @@ class Jeu:
                         self.etat is EtatJeu.VICTOIRE_NIVEAU
                         or self.etat is EtatJeu.PREPARATION
                     ):
+                        if self._terminer_animation_bonus_si_necessaire():
+                            continue
                         self._demarrer_nouveau_niveau()
                         self.etat = EtatJeu.APPROCHE
                     elif (
                         self.etat is EtatJeu.DEFAITE
                         or self.etat is EtatJeu.VICTOIRE_FINALE
                     ):
+                        if self._terminer_animation_bonus_si_necessaire():
+                            continue
                         self._demarrer_nouvelle_partie()
                         self.etat = EtatJeu.APPROCHE
                     elif self.etat is EtatJeu.TOUCHE:
@@ -169,6 +183,12 @@ class Jeu:
            self._reprendre_apres_touche()
            self.etat = EtatJeu.EXECUTION
 
+        if (
+            self.etat is EtatJeu.VICTOIRE_NIVEAU
+            or self.etat is EtatJeu.VICTOIRE_FINALE
+        ):
+            self._mettre_a_jour_bonus_victoire()
+            return
 
         touches = pygame.key.get_pressed()
         direction = DirectionHorizontale.IMMOBILE
@@ -198,7 +218,8 @@ class Jeu:
             self.projectile_joueur.mettre_a_jour()
             self._gerer_collisions_adversaires()
             if self.projectile_joueur is not None and self.projectile_joueur.est_sorti:
-                self.pointage = self.pointage - 100 if self.pointage > 0 else self.pointage
+                self.tirs_perdus += 1
+                self.pointage -= 100
                 self.projectile_joueur = None
 
         self.gestion_tir_adversaires.mettre_a_jour(self.formation_adversaires)
@@ -236,6 +257,7 @@ class Jeu:
 
         # Si tous les adversaires sont éliminés c'est une victoire.
         if self.formation_adversaires.nombre_adversaires == 0:
+            niveau_termine = self.gestionnaire_niveaux.niveau_courant.numero
             self.projectile_joueur = None
             self.gestion_tir_adversaires.projectiles.clear()
             self.effets_visuels.clear()
@@ -243,6 +265,7 @@ class Jeu:
                 self.etat = EtatJeu.VICTOIRE_NIVEAU
             else:
                 self.etat = EtatJeu.VICTOIRE_FINALE
+            self._demarrer_bonus_victoire(niveau_termine)
 
         # Si le pointage courant est supérieur au pointage record
         if self.pointage > self.pointage_record:
@@ -301,11 +324,12 @@ class Jeu:
             )
         elif self.etat is EtatJeu.VICTOIRE_NIVEAU:
             rect = self.afficheur_texte.dessiner(
-                "Préparez-vous...",
+                f"Niveau {self.niveau_victoire} réussi!",
                 50,
                 40,
                 self.config.taille_police_titre,
             )
+            rect = self._dessiner_bonus_victoire(rect)
             self.afficheur_texte.dessiner(
                 "Appuyez ESPACE pour continuer",
                 50,
@@ -314,11 +338,12 @@ class Jeu:
             )
         elif self.etat is EtatJeu.VICTOIRE_FINALE:
             rect = self.afficheur_texte.dessiner(
-                "Bravo! Vous avez réussi à repousser tous les envahisseurs!",
+                "Bravo! Vous avez repoussé tous les envahisseurs!",
                 50,
                 40,
                 self.config.taille_police_titre,
             )
+            rect = self._dessiner_bonus_victoire(rect)
             self.afficheur_texte.dessiner(
                 "Appuyez ESPACE pour une nouvelle partie",
                 50,
@@ -434,6 +459,7 @@ class Jeu:
 
         self.nombre_vies = self.config.nb_vies_initiales
         self.pointage = 0
+        self.tirs_perdus = 0
         self.couleur_pointage = self.config.couleur_pointage
         self.gestionnaire_niveaux.recommencer()
 
@@ -507,6 +533,153 @@ class Jeu:
             return self.clignotement_joueur_touche.est_visible(temps_actuel)
 
         return True
+
+    def _demarrer_bonus_victoire(self, niveau_termine: int) -> None:
+        """
+        Prépare le bonus accordé à la fin d'un niveau.
+        """
+
+        self.niveau_victoire = niveau_termine
+        self.bonus_victoire = (
+            self.nombre_vies
+            * self.config.points_bonus_vie_par_niveau
+            * niveau_termine
+        )
+        self.pointage_depart_bonus = self.pointage
+        self.pointage_cible_bonus = self.pointage + self.bonus_victoire
+        self.instant_depart_bonus = pygame.time.get_ticks()
+        self.prochaine_tranche_son_bonus = self.config.tranche_son_bonus
+        self.animation_bonus_terminee = self.bonus_victoire <= 0
+
+        if self.animation_bonus_terminee:
+            self.pointage = self.pointage_cible_bonus
+
+    def _mettre_a_jour_bonus_victoire(self) -> None:
+        """
+        Anime le pointage jusqu'au total incluant le bonus de victoire.
+        """
+
+        if self.animation_bonus_terminee:
+            return
+
+        temps_ecoule = pygame.time.get_ticks() - self.instant_depart_bonus
+        progression = temps_ecoule / self.config.duree_animation_bonus_ms
+        progression = min(progression, 1.0)
+
+        points_bonus_affiches = int(self.bonus_victoire * progression)
+        points_bonus_affiches -= (
+            points_bonus_affiches % self.config.tranche_son_bonus
+        )
+        self.pointage = self.pointage_depart_bonus + points_bonus_affiches
+
+        while self.prochaine_tranche_son_bonus <= points_bonus_affiches:
+            index_son = self.prochaine_tranche_son_bonus // self.config.tranche_son_bonus
+            self._jouer_son_bonus(index_son)
+            self.prochaine_tranche_son_bonus += self.config.tranche_son_bonus
+
+        if progression >= 1.0:
+            self.pointage = self.pointage_cible_bonus
+            self.animation_bonus_terminee = True
+
+        if self.pointage > self.pointage_record:
+            self.pointage_record = self.pointage
+            self.couleur_pointage = self.config.couleur_pointage_record
+
+    def _terminer_animation_bonus_si_necessaire(self) -> bool:
+        """
+        Termine immédiatement l'animation si le joueur appuie pendant le décompte.
+
+        Retourne True si l'appui a été utilisé pour accélérer l'animation.
+        """
+
+        if self.animation_bonus_terminee:
+            return False
+
+        self.pointage = self.pointage_cible_bonus
+        self.animation_bonus_terminee = True
+
+        if self.pointage > self.pointage_record:
+            self.pointage_record = self.pointage
+            self.couleur_pointage = self.config.couleur_pointage_record
+
+        return True
+
+    def _dessiner_bonus_victoire(self, rect_reference: pygame.Rect) -> pygame.Rect:
+        """
+        Affiche le détail du pointage et du bonus sur les écrans de victoire.
+        """
+
+        decalage_y = rect_reference.height + 10
+        rect = self.afficheur_texte.dessiner(
+            f"Pointage : {self.pointage_depart_bonus}"
+            f" (tirs perdus : {self.tirs_perdus})",
+            50,
+            40,
+            decalage_y_px=decalage_y,
+        )
+        
+        decalage_y += rect.height + 10
+        rect = self.afficheur_texte.dessiner(
+            f"Bonus : {self.nombre_vies}"
+            f" x {self.config.points_bonus_vie_par_niveau}"
+            f" x {self.niveau_victoire}"
+            f" = {self.bonus_victoire}",
+            50,
+            40,
+            self.config.taille_police_texte,
+            self.config.couleur_bonus,
+            decalage_y,
+        )
+
+        decalage_y += rect.height + 20
+        rect = self.afficheur_texte.dessiner(
+            f"Total : {self.pointage}",
+            50,
+            40,
+            self.config.taille_police_titre,
+            self.config.couleur_pointage,
+            decalage_y,
+        )
+
+        return rect_reference.union(rect)
+
+    def _jouer_son_bonus(self, index_son: int) -> None:
+        """
+        Joue un court son de bonus dont la hauteur monte progressivement.
+        """
+
+        son = self.sons_bonus.get(index_son)
+
+        if son is None:
+            son = self._creer_son_bonus(index_son)
+            self.sons_bonus[index_son] = son
+
+        son.play()
+
+    def _creer_son_bonus(self, index_son: int) -> pygame.mixer.Sound:
+        """
+        Génère un court bip sans ajouter de fichier audio au projet.
+        """
+
+        frequence_mixeur, _, canaux = pygame.mixer.get_init()
+        frequence_son = (
+            self.config.frequence_son_bonus_depart
+            + self.config.increment_frequence_son_bonus * index_son
+        )
+        nb_echantillons = int(
+            frequence_mixeur * self.config.duree_son_bonus_ms / 1000
+        )
+        amplitude = 9000
+        echantillons = array("h")
+
+        for index_echantillon in range(nb_echantillons):
+            temps = index_echantillon / frequence_mixeur
+            valeur = int(amplitude * math.sin(math.tau * frequence_son * temps))
+
+            for _ in range(canaux):
+                echantillons.append(valeur)
+
+        return pygame.mixer.Sound(buffer=echantillons)
     
     def _creer_surface_affichage(self, mode_fenetre: bool) -> tuple[pygame.Surface, pygame.Rect]:
         """

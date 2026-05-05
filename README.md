@@ -81,8 +81,9 @@ pointage :
 vies restantes x 500 x niveau terminé
 ```
 
-Le total est affiché avec une courte animation de comptage et un son montant par
-tranche de points.
+Le total est affiché avec une animation de comptage à cadence constante. Le
+pointage monte par tranches de points avec un son montant, et la durée totale
+s'adapte au bonus obtenu.
 
 ## Structure
 

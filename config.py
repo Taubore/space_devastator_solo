@@ -44,12 +44,12 @@ class Configuration:
     duree_clignotement_joueur_touche_ms: int = 1300
     nb_vies_initiales: int = 3
     points_par_adversaire: int = 100
-    points_bonus_vie_par_niveau: int = 500
-    duree_animation_bonus_ms: int = 1800
+    points_bonus_vie_par_niveau: int = 300
     tranche_son_bonus: int = 100
-    frequence_son_bonus_depart: int = 440
-    increment_frequence_son_bonus: int = 18
-    duree_son_bonus_ms: int = 35
+    duree_tranche_bonus_ms: int = 80
+    frequence_son_bonus_depart: int = 500
+    increment_frequence_son_bonus: int = 25
+    duree_son_bonus_ms: int = 30
 
     # Sons
     son_projectile_joueur: str = "assets/sons/projectile_joueur.wav"

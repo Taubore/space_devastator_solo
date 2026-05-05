@@ -314,8 +314,7 @@ class Jeu:
             self.afficheur_texte.dessiner(
                 "Appuyez ESPACE pour démarrer",
                 50,
-                40,
-                decalage_y_px=rect.height + 10
+                70,
             )
         elif self.etat is EtatJeu.APPROCHE:
             self.animation_approche_adversaires.dessiner(
@@ -324,35 +323,39 @@ class Jeu:
             )
         elif self.etat is EtatJeu.VICTOIRE_NIVEAU:
             rect = self.afficheur_texte.dessiner(
-                f"Niveau {self.niveau_victoire} réussi!",
+                f"Niveau {self.niveau_victoire} réussi !",
                 50,
-                40,
+                20,
                 self.config.taille_police_titre,
             )
-            rect = self._dessiner_bonus_victoire(rect)
+            rect = self._dessiner_bonus_victoire()
             self.afficheur_texte.dessiner(
                 "Appuyez ESPACE pour continuer",
                 50,
-                40,
-                decalage_y_px=rect.height + 10
+                70,
             )
         elif self.etat is EtatJeu.VICTOIRE_FINALE:
             rect = self.afficheur_texte.dessiner(
-                "Bravo! Vous avez repoussé tous les envahisseurs!",
+                "Victoire !",
                 50,
-                40,
+                15,
                 self.config.taille_police_titre,
             )
-            rect = self._dessiner_bonus_victoire(rect)
+            rect = self.afficheur_texte.dessiner(
+                "Vous avez repoussé tous les envahisseurs !",
+                50,
+                rect,
+                self.config.taille_police_titre - 16,
+            )
+            rect = self._dessiner_bonus_victoire()
             self.afficheur_texte.dessiner(
                 "Appuyez ESPACE pour une nouvelle partie",
                 50,
-                40,
-                decalage_y_px=rect.height + 10
+                70,
             )
         elif self.etat is EtatJeu.DEFAITE:
             rect = self.afficheur_texte.dessiner(
-                "Les envahisseurs se sont emparés de la Terre!",
+                "Les envahisseurs se sont emparés de la Terre !",
                 50,
                 40,
                 self.config.taille_police_titre,
@@ -360,8 +363,7 @@ class Jeu:
             self.afficheur_texte.dessiner(
                 "Appuyez ESPACE pour une nouvelle partie",
                 50,
-                40,
-                decalage_y_px=rect.height + 10
+                70,
             )
         else:
             self.formation_adversaires.dessiner(self.surface_jeu)
@@ -375,8 +377,9 @@ class Jeu:
         self.afficheur_texte.dessiner(
             texte, 98, 2, self.config.taille_police_texte, self.couleur_pointage)
         
-        texte = f"Niveau {str(self.gestionnaire_niveaux.niveau_courant.numero)}"
-        self.afficheur_texte.dessiner(texte, 2, 98, self.config.taille_police_base)
+        if self.etat is EtatJeu.EXECUTION:
+            texte = f"Niveau {str(self.gestionnaire_niveaux.niveau_courant.numero)}"
+            self.afficheur_texte.dessiner(texte, 2, 98, self.config.taille_police_base)
         
         # Affiche des minis vaisseaux pour chaque vie
         position_x_vies = round(self.surface_jeu.get_width() * 98 / 100)
@@ -403,13 +406,18 @@ class Jeu:
                     (self.config.limite_x_min_zone_jouable, self.config.axe_y_defaite),
                     (self.config.limite_x_max_zone_jouable, self.config.axe_y_defaite),
                 )
+                pct_y_alerte = round(
+                    (self.config.axe_y_defaite - 30)
+                    * 100
+                    / self.surface_jeu.get_height()
+                )
                 self.afficheur_texte.dessiner(
                     "ALERTE : invasion imminente!",
                     50,
-                    0,
+                    pct_y_alerte,
                     self.config.taille_police_texte,
                     self.config.couleur_axe_defaite,
-                    self.config.axe_y_defaite - 30)
+                )
 
         # Affiche la surface du jeu sans étirement avec des bords noir au besoin
         self.surface_affichage.fill((0, 0, 0))
@@ -563,21 +571,25 @@ class Jeu:
             return
 
         temps_ecoule = pygame.time.get_ticks() - self.instant_depart_bonus
-        progression = temps_ecoule / self.config.duree_animation_bonus_ms
-        progression = min(progression, 1.0)
+        nb_tranches_affichees = (
+            temps_ecoule // self.config.duree_tranche_bonus_ms
+        )
 
-        points_bonus_affiches = int(self.bonus_victoire * progression)
-        points_bonus_affiches -= (
-            points_bonus_affiches % self.config.tranche_son_bonus
+        points_bonus_affiches = min(
+            nb_tranches_affichees * self.config.tranche_son_bonus,
+            self.bonus_victoire,
         )
         self.pointage = self.pointage_depart_bonus + points_bonus_affiches
 
         while self.prochaine_tranche_son_bonus <= points_bonus_affiches:
-            index_son = self.prochaine_tranche_son_bonus // self.config.tranche_son_bonus
+            index_son = (
+                self.prochaine_tranche_son_bonus
+                // self.config.tranche_son_bonus
+            )
             self._jouer_son_bonus(index_son)
             self.prochaine_tranche_son_bonus += self.config.tranche_son_bonus
 
-        if progression >= 1.0:
+        if points_bonus_affiches >= self.bonus_victoire:
             self.pointage = self.pointage_cible_bonus
             self.animation_bonus_terminee = True
 
@@ -604,44 +616,38 @@ class Jeu:
 
         return True
 
-    def _dessiner_bonus_victoire(self, rect_reference: pygame.Rect) -> pygame.Rect:
+    def _dessiner_bonus_victoire(self) -> pygame.Rect:
         """
         Affiche le détail du pointage et du bonus sur les écrans de victoire.
         """
 
-        decalage_y = rect_reference.height + 10
         rect = self.afficheur_texte.dessiner(
             f"Pointage : {self.pointage_depart_bonus}"
             f" (tirs perdus : {self.tirs_perdus})",
             50,
             40,
-            decalage_y_px=decalage_y,
         )
         
-        decalage_y += rect.height + 10
         rect = self.afficheur_texte.dessiner(
             f"Bonus : {self.nombre_vies}"
             f" x {self.config.points_bonus_vie_par_niveau}"
             f" x {self.niveau_victoire}"
             f" = {self.bonus_victoire}",
             50,
-            40,
+            rect,
             self.config.taille_police_texte,
             self.config.couleur_bonus,
-            decalage_y,
         )
 
-        decalage_y += rect.height + 20
         rect = self.afficheur_texte.dessiner(
             f"Total : {self.pointage}",
             50,
-            40,
+            rect,
             self.config.taille_police_titre,
             self.config.couleur_pointage,
-            decalage_y,
         )
 
-        return rect_reference.union(rect)
+        return rect
 
     def _jouer_son_bonus(self, index_son: int) -> None:
         """

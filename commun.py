@@ -98,7 +98,10 @@ class Clignotement:
 
         self.minuteur_phase.reinitialiser()
 
+
 class AfficheurTexte:
+    RATIO_ESPACEMENT_LIGNES = 0.35
+
     def __init__(
         self,
         surface: pygame.Surface,
@@ -118,19 +121,32 @@ class AfficheurTexte:
     def dessiner(
         self,
         texte: str,
-        pctX: int,
-        pctY: int,
+        pct_x: int,
+        pct_y: int | pygame.Rect | None = None,
         taille: int = -1,
         couleur: tuple[int, int, int] = (-1, -1, -1),
-        decalage_y_px: int = 0,
+        rect_precedent: pygame.Rect | None = None,
     ) -> pygame.Rect:
         """
-        Dessine le texte passé en paramètre à la position relative indiquée. La position relative
-        est calculé en pourcentage de la surface qui a été passé en paramètre à l'objet
-        AfficherTexte. Par exemple, pour avoir un texte centré dans la surface, il faut que posX 
-        soit à 50 et posY à 50. Si on veut du texte justifiée en bas à droite, il faut posX à 100 
-        et posY à 100 
+        Dessine le texte avec un X en pourcentage et un Y absolu ou relatif.
+
+        Le Y absolu est calculé avec pct_y, en pourcentage de la surface.
+        Le Y relatif est calculé à partir du rect de la ligne précédente.
         """
+        if isinstance(pct_y, pygame.Rect):
+            if rect_precedent is not None:
+                raise ValueError(
+                    "Utilisez pct_y ou rect_precedent, mais pas les deux."
+                )
+            rect_precedent = pct_y
+            pct_y = None
+
+        if rect_precedent is not None and pct_y is not None:
+            raise ValueError("Utilisez pct_y ou rect_precedent, mais pas les deux.")
+
+        if rect_precedent is None and pct_y is None:
+            raise ValueError("pct_y ou rect_precedent doit être fourni.")
+
         if taille != -1:
             self.police.point_size = taille
         else:
@@ -144,10 +160,19 @@ class AfficheurTexte:
             couleur_texte,
         )
 
-        position_x = round(self.surface.get_width() * pctX / 100)
-        position_y = round(self.surface.get_height() * pctY / 100)
-        decalage_x = round(surface_txt.get_width() * pctX / 100)
-        decalage_y = round(surface_txt.get_height() * pctY / 100) - decalage_y_px
+        position_x = round(self.surface.get_width() * pct_x / 100)
+        decalage_x = round(surface_txt.get_width() * pct_x / 100)
+
+        if rect_precedent is None:
+            assert isinstance(pct_y, int)
+            position_y = round(self.surface.get_height() * pct_y / 100)
+            decalage_y = round(surface_txt.get_height() * pct_y / 100)
+        else:
+            espacement_y = round(
+                rect_precedent.height * self.RATIO_ESPACEMENT_LIGNES
+            )
+            position_y = rect_precedent.bottom + espacement_y
+            decalage_y = 0
 
         rect = surface_txt.get_rect(
             topleft=(position_x - decalage_x, position_y - decalage_y)

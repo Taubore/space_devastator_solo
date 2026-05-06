@@ -16,6 +16,7 @@ Fonctionnalités présentes :
 - tir du joueur avec un seul projectile actif ;
 - formation d'adversaires mobile ;
 - tirs adverses ;
+- adversaire bonus optionnel par niveau ;
 - collisions joueur, adversaires et projectiles ;
 - pointage, nombre de vies et bonus de victoire ;
 - effets visuels simples ;
@@ -78,12 +79,21 @@ Après une victoire de niveau ou une victoire finale, un bonus est ajouté au
 pointage :
 
 ```text
-vies restantes x 500 x niveau terminé
+vies restantes x 250 x niveau terminé
 ```
 
 Le total est affiché avec une animation de comptage à cadence constante. Le
 pointage monte par tranches de points avec un son montant, et la durée totale
 s'adapte au bonus obtenu.
+
+## Niveaux
+
+Les paramètres des niveaux sont regroupés dans `niveaux.py`. Chaque niveau peut
+activer ou désactiver l'adversaire bonus avec `adversaire_bonus_actif`, puis
+régler sa vitesse et son délai d'apparition aléatoire.
+
+L'adversaire bonus apparaît au maximum une fois par niveau. Son minuteur est
+amorcé lorsque la zone haute jouable est libre d'adversaires.
 
 ## Structure
 
@@ -105,6 +115,7 @@ Rôle des principaux fichiers :
 
 - `main.py` : boucle principale, états du jeu, événements et rendu ;
 - `config.py` : paramètres stables du jeu ;
+- `niveaux.py` : progression et paramètres propres à chaque niveau ;
 - `etats.py` : énumérations des états et directions ;
 - `objets.py` : joueur, adversaires, projectiles et formation ;
 - `effets.py` : effets visuels temporaires ;

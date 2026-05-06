@@ -3,51 +3,38 @@ import pygame
 
 class Minuteur:
     """
-    Gère une durée mesurée à partir de l'instant de construction ou de
-    réinitialisation.
+    Mesure une durée après un démarrage explicite.
     """
 
-    def __init__(self, duree_ms: int, demarrer: bool = True) -> None:
-        """
-        Construit un minuteur générique basé sur l'horloge de pygame.
-        """
-
+    def __init__(self, duree_ms: int) -> None:
         self.duree_ms = duree_ms
         self.instant_depart = 0
+        self.actif = False
 
-        if demarrer:
-            self.reinitialiser()
+    @property
+    def est_actif(self) -> bool:
+        return self.actif
 
-    def est_termine(self, instant_ms: int | None = None) -> bool:
-        """
-        Retourne True lorsque la durée configurée est atteinte.
-        """
+    @property
+    def est_termine(self) -> bool:
+        if not self.actif:
+            return False
 
-        if self.duree_ms <= 0:
-            return True
+        temps_ecoule = pygame.time.get_ticks() - self.instant_depart
+        return temps_ecoule >= self.duree_ms
 
-        if instant_ms is None:
-            instant_ms = pygame.time.get_ticks()
+    def demarrer(self) -> None:
+        self.instant_depart = pygame.time.get_ticks()
+        self.actif = True
 
-        return instant_ms - self.instant_depart >= self.duree_ms
+    def arreter(self) -> None:
+        self.actif = False
 
     def reinitialiser(self) -> None:
-        """
-        Relance le minuteur à partir de l'instant courant.
-        """
+        self.demarrer()
 
-        self.instant_depart = pygame.time.get_ticks()
-
-    def changer_duree(self, duree_ms: int, reinitialiser: bool = False) -> None:
-        """
-        Met à jour la durée. Réinitialise aussi le départ si demandé.
-        """
-
+    def modifier_duree(self, duree_ms: int) -> None:
         self.duree_ms = duree_ms
-
-        if reinitialiser:
-            self.reinitialiser()
-
 
 class Clignotement:
     """
@@ -70,12 +57,12 @@ class Clignotement:
 
         return self.minuteur_phase.duree_ms
 
-    def changer_duree(self, duree_ms: int, reinitialiser: bool = False) -> None:
+    def changer_duree(self, duree_ms: int) -> None:
         """
         Met à jour la durée d'une phase de clignotement.
         """
 
-        self.minuteur_phase.changer_duree(duree_ms, reinitialiser)
+        self.minuteur_phase.modifier_duree(duree_ms)
 
     def est_visible(self, instant_ms: int) -> bool:
         """

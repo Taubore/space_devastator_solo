@@ -23,6 +23,7 @@ from objets import (
     AnimationApprocheAdversaires,
     ProjectileJoueur,
     GestionTirAdversaires,
+    GestionAdversaireBonus,
 )
 
 
@@ -65,6 +66,8 @@ class Jeu:
             "projectile_adversaire": pygame.mixer.Sound(self.config.son_projectile_adversaire),
             "explosion_joueur": pygame.mixer.Sound(self.config.son_explosion_joueur),
             "explosion_adversaire": pygame.mixer.Sound(self.config.son_explosion_adversaire),
+            "adversaire_bonus": pygame.mixer.Sound(self.config.son_adversaire_bonus),
+            "victoire": pygame.mixer.Sound(self.config.son_victoire),
         }
         self.sons_bonus: dict[int, pygame.mixer.Sound] = {}
 
@@ -72,8 +75,8 @@ class Jeu:
 
         self.horloge = pygame.time.Clock()
         self.duree_clignotement_joueur_touche = Minuteur(
-            self.config.duree_clignotement_joueur_touche_ms, False
-            )
+            self.config.duree_clignotement_joueur_touche_ms
+        )
 
         self.joueur = Joueur(self.config)
         self.formation_adversaires = FormationAdversaires(self.config)
@@ -91,6 +94,10 @@ class Jeu:
             self.sons["projectile_adversaire"],
             self.config
         )
+        self.gestion_adversaire_bonus = GestionAdversaireBonus(
+            self.sons["adversaire_bonus"],
+            self.config,
+        )
 
         # Objet utilitaire pour afficher du texte à l'écran.
         self.afficheur_texte = AfficheurTexte(
@@ -107,6 +114,9 @@ class Jeu:
         self.instant_depart_bonus = 0
         self.prochaine_tranche_son_bonus = 0
         self.animation_bonus_terminee = True
+
+        self.derniere_pos_x_projectile_joueur = 0
+        self.minuteur_perte_projectile = Minuteur(250)
 
         self.etat = EtatJeu.PREPARATION
 
@@ -178,7 +188,7 @@ class Jeu:
 
         if (
             self.etat is EtatJeu.TOUCHE 
-            and self.duree_clignotement_joueur_touche.est_termine()
+            and self.duree_clignotement_joueur_touche.est_termine
         ):
            self._reprendre_apres_touche()
            self.etat = EtatJeu.EXECUTION
@@ -207,6 +217,8 @@ class Jeu:
         if self.etat is not EtatJeu.EXECUTION:
             return
 
+        self.gestion_adversaire_bonus.mettre_a_jour(self.formation_adversaires)
+
         # Gestion du bouton de tir
         touche_tir = touches[pygame.K_a]
         if touche_tir and not self.touche_tir_precedente:
@@ -217,9 +229,12 @@ class Jeu:
         if self.projectile_joueur is not None:
             self.projectile_joueur.mettre_a_jour()
             self._gerer_collisions_adversaires()
+            self._gerer_collisions_adversaire_bonus()
             if self.projectile_joueur is not None and self.projectile_joueur.est_sorti:
+                self.minuteur_perte_projectile.demarrer()
                 self.tirs_perdus += 1
-                self.pointage -= 100
+                self.pointage += self.config.points_projectile_perdu
+                self.derniere_pos_x_projectile_joueur = self.projectile_joueur.rect.centerx
                 self.projectile_joueur = None
 
         self.gestion_tir_adversaires.mettre_a_jour(self.formation_adversaires)
@@ -264,6 +279,7 @@ class Jeu:
             if self.gestionnaire_niveaux.passer_au_niveau_suivant():
                 self.etat = EtatJeu.VICTOIRE_NIVEAU
             else:
+                self.sons["victoire"].play()
                 self.etat = EtatJeu.VICTOIRE_FINALE
             self._demarrer_bonus_victoire(niveau_termine)
 
@@ -299,6 +315,20 @@ class Jeu:
 
         if self.projectile_joueur is not None:
             self.projectile_joueur.dessiner(self.surface_jeu)
+
+        # Affiche la perte de pointage pendant quelques temps si projectile du joueur est sorti
+        if self.minuteur_perte_projectile.est_actif:
+            police = pygame.font.Font(None, self.config.taille_police_pointage_explosion)
+            surface_txt = police.render(
+                str(self.config.points_projectile_perdu),
+                True,
+                self.config.couleur_pointage_negatif
+            )
+            pos = self.derniere_pos_x_projectile_joueur - 15, self.config.limite_y_min_zone_jouable
+            self.surface_jeu.blit(surface_txt, pos)
+            if self.minuteur_perte_projectile.est_termine:
+                self.minuteur_perte_projectile.arreter()
+
 
         self._dessiner_effets_visuels()
 
@@ -336,7 +366,7 @@ class Jeu:
             )
         elif self.etat is EtatJeu.VICTOIRE_FINALE:
             rect = self.afficheur_texte.dessiner(
-                "Victoire !",
+                f"VICTOIRE ! Niveau {self.niveau_victoire} réussi !",
                 50,
                 15,
                 self.config.taille_police_titre,
@@ -367,6 +397,7 @@ class Jeu:
             )
         else:
             self.formation_adversaires.dessiner(self.surface_jeu)
+            self.gestion_adversaire_bonus.dessiner(self.surface_jeu)
 
         # Dessine le pointage et les vies
         texte = f"{str(self.pointage)}"
@@ -377,7 +408,7 @@ class Jeu:
         self.afficheur_texte.dessiner(
             texte, 98, 2, self.config.taille_police_texte, self.couleur_pointage)
         
-        if self.etat is EtatJeu.EXECUTION:
+        if self.etat is EtatJeu.EXECUTION or self.etat is EtatJeu.TOUCHE:
             texte = f"Niveau {str(self.gestionnaire_niveaux.niveau_courant.numero)}"
             self.afficheur_texte.dessiner(texte, 2, 98, self.config.taille_police_base)
         
@@ -467,7 +498,6 @@ class Jeu:
 
         self.nombre_vies = self.config.nb_vies_initiales
         self.pointage = 0
-        self.tirs_perdus = 0
         self.couleur_pointage = self.config.couleur_pointage
         self.gestionnaire_niveaux.recommencer()
 
@@ -497,6 +527,7 @@ class Jeu:
         partie après avoir vaincu un niveau
         """
 
+        self.tirs_perdus = 0
         self.touche_tir_precedente = False
         self.defaite_imminente = False 
         self.projectile_joueur = None
@@ -507,6 +538,12 @@ class Jeu:
         # nos différents objets à partir de ces paramètres
         params = self.gestionnaire_niveaux.niveau_courant
         self.gestion_tir_adversaires.initialiser(params.nb_canaux_tir)
+        self.gestion_adversaire_bonus.initialiser(
+            params.adversaire_bonus_actif,
+            params.vitesse_adversaire_bonus,
+            params.delai_min_adversaire_bonus_ms,
+            params.delai_max_adversaire_bonus_ms,
+        )
         self.formation_adversaires.creer_adversaires(
             params.vitesse_formation_adversaires,
             params.colonnes_adversaires,
@@ -551,7 +588,7 @@ class Jeu:
         self.bonus_victoire = (
             self.nombre_vies
             * self.config.points_bonus_vie_par_niveau
-            * niveau_termine
+            * self._calculer_multiplicateur_bonus()
         )
         self.pointage_depart_bonus = self.pointage
         self.pointage_cible_bonus = self.pointage + self.bonus_victoire
@@ -622,20 +659,44 @@ class Jeu:
         """
 
         rect = self.afficheur_texte.dessiner(
-            f"Pointage : {self.pointage_depart_bonus}"
-            f" (tirs perdus : {self.tirs_perdus})",
+            f"Pointage : {self.pointage_depart_bonus}",
             50,
-            40,
+            35,
+            self.config.taille_police_texte + 8
         )
+
+        multiplicateur_bonus = self._calculer_multiplicateur_bonus()
         
+        if multiplicateur_bonus == 5:
+            texte_bonus = "Aucun tir perdu. Bonus x 5"
+        elif multiplicateur_bonus == 3:
+            texte_bonus = "Moins de 5 tirs perdus. Bonus x 3"
+        elif multiplicateur_bonus == 2:
+            texte_bonus = "Seulement 6 à 10 tirs perdus. Bonus x 2"
+        else:
+            texte_bonus = f"{self.tirs_perdus} tirs perdus. Bonus x 1"
+
+        rect = self.afficheur_texte.dessiner(
+            texte_bonus,
+            50,
+            rect,
+            self.config.taille_police_texte - 4,
+        )
+
+        rect = self.afficheur_texte.dessiner(
+            f"---------------------------------------------------",
+            50,
+            rect,
+        )
+
         rect = self.afficheur_texte.dessiner(
             f"Bonus : {self.nombre_vies}"
             f" x {self.config.points_bonus_vie_par_niveau}"
-            f" x {self.niveau_victoire}"
+            f" x {multiplicateur_bonus}" 
             f" = {self.bonus_victoire}",
             50,
             rect,
-            self.config.taille_police_texte,
+            self.config.taille_police_texte + 8,
             self.config.couleur_bonus,
         )
 
@@ -648,6 +709,20 @@ class Jeu:
         )
 
         return rect
+
+    def _calculer_multiplicateur_bonus(self) -> int:
+        """
+        Calcule le multiplicateur de bonus
+        """
+        multiplicateur_bonus = 1
+        if self.tirs_perdus == 0:
+            multiplicateur_bonus = 5
+        elif self.tirs_perdus < 5:
+            multiplicateur_bonus = 3
+        elif self.tirs_perdus < 10:
+            multiplicateur_bonus = 2
+
+        return multiplicateur_bonus
 
     def _jouer_son_bonus(self, index_son: int) -> None:
         """
@@ -745,6 +820,25 @@ class Jeu:
                 self.formation_adversaires.adversaires.remove(adv)
                 self.projectile_joueur = None
                 self.pointage += adv.ValeurPointage
+
+    def _gerer_collisions_adversaire_bonus(self) -> None:
+        """
+        Gère les collisions d'un projectile du joueur avec l'adversaire bonus
+        """
+
+        if self.projectile_joueur is not None:
+            adv = self.gestion_adversaire_bonus.adversaire
+            if adv is not None:
+                points = self.gestionnaire_niveaux.niveau_courant.pointage_adversaire_bonus
+                if adv.verifier_collision(self.projectile_joueur.rect):
+                    self.gestion_adversaire_bonus.retirer_adversaire()
+                    self.effets_visuels.append(
+                        Explosion(adv.rect.center, points, self.config)
+                    )
+                    self.sons["explosion_adversaire"].play()
+                    self.projectile_joueur = None
+                    self.pointage += points
+
 
     def _charger_fichier_config(self) -> ConfigParser:
         """

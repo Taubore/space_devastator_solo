@@ -22,10 +22,12 @@ class Configuration:
     taille_police_titre: int = 44
     taille_police_texte: int = 22
     taille_police_base: int = 22
+    taille_police_pointage_explosion: int = 24
     
     couleur_fond: tuple[int, int, int] = (8, 10, 20)
     couleur_texte: tuple[int, int, int] = (204, 229, 255)
     couleur_pointage: tuple[int, int, int] = (51, 153, 255)
+    couleur_pointage_negatif: tuple[int, int, int] = (255, 0, 0)
     couleur_pointage_record: tuple[int, int, int] = (255, 51, 51)    
     couleur_bonus: tuple[int, int, int] = (255, 210, 80)
     couleur_axe_defaite : tuple[int, int, int] = (236, 42, 42)
@@ -37,14 +39,16 @@ class Configuration:
         "assets/images/soucoupe_volante_rouge.png",
         "assets/images/soucoupe_volante_rouge.png",
     )
+    image_adversaire_bonus: str = "assets/images/soucoupe_volante_jaune.png"
          
-
     freq_clignotement_defaut_ms: int = 500
     freq_clignotement_joueur_touche_ms: int = 120
     duree_clignotement_joueur_touche_ms: int = 1300
     nb_vies_initiales: int = 3
-    points_par_adversaire: int = 100
-    points_bonus_vie_par_niveau: int = 300
+
+    # Gestion des bonus
+    points_bonus_vie_par_niveau: int = 250
+    points_projectile_perdu: int = -100
     tranche_son_bonus: int = 100
     duree_tranche_bonus_ms: int = 80
     frequence_son_bonus_depart: int = 500
@@ -57,6 +61,7 @@ class Configuration:
     son_explosion_joueur: str = "assets/sons/explosion_joueur.wav"
     son_explosion_adversaire: str = "assets/sons/explosion_adversaire.wav"
     son_adversaire_bonus: str = "assets/sons/adversaire_bonus.wav"
+    son_victoire: str = "assets/sons/victoire.mp3"
 
     # Joueur
     couleur_joueur: tuple[int, int, int] = (80, 220, 255)  # À retirer lorsque sprite
@@ -81,6 +86,7 @@ class Configuration:
     echelle_initiale_approche_adversaires: float = 0.50
     amplitude_flottement_adversaire: int = 3
     vitesse_flottement_adversaire: float = 0.004
+    hauteur_zone_declenchement_adversaire_bonus: int = 96
 
      # Effets visuels
     duree_explosion_adversaire_ms: int = 220

@@ -61,15 +61,15 @@ class Explosion(EffetVisuel):
         Dessine l'explosion selon sa progression.
         """
 
+        # On affiche le pointage selon le type d'adversaire
+        police = pygame.font.Font(None, self.config.taille_police_pointage_explosion)
+        surface_txt = police.render(str(self.pointage), True, self.config.couleur_pointage)
+        pos = self.centre[0]-30, self.centre[1]-50
+        surface.blit(surface_txt, pos)
+
         temps_ecoule = pygame.time.get_ticks() - self.instant_depart
         progression = temps_ecoule / self.config.duree_explosion_adversaire_ms
         progression = min(progression, 1.0)
-
-        # On affiche le pointage selon le type d'adversaire
-        police = pygame.font.Font(None, 16)
-        surface_txt = police.render(str(self.pointage), True, self.config.couleur_texte)
-        pos = self.centre[0]-20, self.centre[1]-30
-        surface.blit(surface_txt, pos)
 
         rayon = int(
             self.config.rayon_explosion_min

@@ -89,6 +89,7 @@ class ProjectileJoueur:
         self.rect.centerx = x_centre
         self.rect.bottom = y_haut
         self.limite_projectile_haut = config.limite_y_min_zone_jouable
+        self.minuteur = Minuteur(500)
         
     @property
     def est_sorti(self) -> bool:
@@ -107,7 +108,8 @@ class ProjectileJoueur:
 
     def dessiner(self, surface: pygame.Surface) -> None:
         """
-        Dessine le projectile sous forme de rectangle.
+        Dessine le projectile sous forme de rectangle et si le projectile est entrain de 
+        sortir de l'écran on affiche le retrait de pointage
         """
         
         pygame.draw.rect(
@@ -230,6 +232,13 @@ class FormationAdversaires:
 
         return None
 
+    def occupe_zone(self, rect: pygame.Rect) -> bool:
+        """
+        Indique si au moins un adversaire occupe le rectangle donné.
+        """
+
+        return any(adv.rect.colliderect(rect) for adv in self.adversaires)
+
     def trouver_tireurs_valides(self) -> list[Adversaire]:
         """
         Retourne les adversaires qui sont en première ligne dans leur colonne.
@@ -283,6 +292,185 @@ class FormationAdversaires:
 
         for adv in self.adversaires:
             adv.dessiner(surface)
+
+
+class AdversaireBonus:
+    """
+    Adversaire bonus traversant le haut de l'écran.
+    """
+
+    def __init__(
+        self,
+        direction: DirectionHorizontale,
+        vitesse: int,
+        config: Configuration,
+    ) -> None:
+        """
+        Constructeur.
+        """
+
+        self.config = config
+        self.direction = direction
+        self.vitesse = vitesse
+        self.rect = pygame.Rect(
+            0,
+            config.limite_y_min_zone_jouable,
+            config.largeur_adversaire,
+            config.hauteur_adversaire,
+        )
+
+        if direction is DirectionHorizontale.DROITE:
+            self.rect.left = config.limite_x_min_zone_jouable
+        else:
+            self.rect.right = config.limite_x_max_zone_jouable
+
+        self.image = pygame.image.load(config.image_adversaire_bonus).convert_alpha()
+        self.image = pygame.transform.smoothscale(
+            self.image,
+            (config.largeur_adversaire, config.hauteur_adversaire),
+        )
+
+    @property
+    def est_sorti(self) -> bool:
+        """
+        Indique si l'adversaire bonus a quitté la zone jouable.
+        """
+
+        if self.direction is DirectionHorizontale.DROITE:
+            return self.rect.left > self.config.limite_x_max_zone_jouable
+
+        return self.rect.right < self.config.limite_x_min_zone_jouable
+
+    def mettre_a_jour(self) -> None:
+        """
+        Déplace l'adversaire bonus horizontalement.
+        """
+
+        self.rect.x += int(self.direction) * self.vitesse
+
+    def dessiner(self, surface: pygame.Surface) -> None:
+        """
+        Dessine l'adversaire bonus.
+        """
+
+        surface.blit(self.image, self.rect)
+
+    def verifier_collision(self, rect: pygame.Rect) -> bool:
+        """
+        Vérfie s'il y a collision avec le rectangle passé en paramètre.
+        """
+        
+        rect_reduit = self.rect.inflate(0, -30)
+
+        return rect_reduit.colliderect(rect)
+
+
+class GestionAdversaireBonus:
+    """
+    Contrôle l'apparition unique de l'adversaire bonus pour un niveau.
+    """
+
+    def __init__(self, son: pygame.mixer.Sound, config: Configuration) -> None:
+        """
+        Constructeur.
+        """
+
+        self.son = son
+        self.config = config
+        self.adversaire: AdversaireBonus | None = None
+        self.minuteur_apparition: Minuteur | None = None
+        self.actif = False
+        self.est_apparu = False
+        self.vitesse = 0
+        self.delai_min_ms = 0
+        self.delai_max_ms = 0
+
+    def initialiser(
+        self,
+        actif: bool,
+        vitesse: int,
+        delai_min_ms: int,
+        delai_max_ms: int,
+    ) -> None:
+        """
+        Réinitialise l'adversaire bonus pour le niveau courant.
+        """
+
+        self.actif = actif
+        self.vitesse = vitesse
+        self.delai_min_ms = delai_min_ms
+        self.delai_max_ms = max(delai_min_ms, delai_max_ms)
+        self.adversaire = None
+        self.minuteur_apparition = None
+        self.est_apparu = False
+
+    def mettre_a_jour(self, formation: FormationAdversaires) -> None:
+        """
+        Amorce l'apparition et met à jour l'adversaire bonus actif.
+        """
+
+        if self.adversaire is not None:
+            self.adversaire.mettre_a_jour()
+
+            if self.adversaire.est_sorti:
+                self.retirer_adversaire()
+
+            return
+
+        if not self.actif or self.est_apparu:
+            return
+
+        if self.minuteur_apparition is None:
+            if not formation.occupe_zone(self._rect_declenchement()):
+                delai_ms = random.randint(self.delai_min_ms, self.delai_max_ms)
+                self.minuteur_apparition = Minuteur(delai_ms)
+                self.minuteur_apparition.demarrer()
+            return
+
+        if self.minuteur_apparition.est_termine:
+            self._faire_apparaitre()
+
+    def dessiner(self, surface: pygame.Surface) -> None:
+        """
+        Dessine l'adversaire bonus s'il est présent.
+        """
+
+        if self.adversaire is not None:
+            self.adversaire.dessiner(surface)
+
+    def _rect_declenchement(self) -> pygame.Rect:
+        """
+        Retourne la zone haute qui doit être libre pour amorcer le minuteur.
+        """
+
+        return pygame.Rect(
+            self.config.limite_x_min_zone_jouable,
+            self.config.limite_y_min_zone_jouable,
+            self.config.limite_x_max_zone_jouable
+            - self.config.limite_x_min_zone_jouable,
+            self.config.hauteur_zone_declenchement_adversaire_bonus,
+        )
+
+    def _faire_apparaitre(self) -> None:
+        """
+        Crée l'adversaire bonus et joue son son d'apparition.
+        """
+
+        direction = random.choice(
+            [DirectionHorizontale.GAUCHE, DirectionHorizontale.DROITE]
+        )
+        self.adversaire = AdversaireBonus(direction, self.vitesse, self.config)
+        self.est_apparu = True
+        self.son.play(loops=-1)
+
+    def retirer_adversaire(self) -> None:
+        """
+        Retire l'adversaire bonus et arrête son son s'il est visible.
+        """
+
+        self.son.stop()
+        self.adversaire = None    
+
 
 class ProjectileAdversaire:
     """Projectile tiré par les Adversaires vers le bas."""
@@ -446,6 +634,7 @@ class GestionTirAdversaires:
                 self.VITESSE_TIR_INITIAL_MAX,
             )
             self.minuteurs.insert(index_minuteur, Minuteur(duree))
+            self.minuteurs[index_minuteur].demarrer()
 
         self.projectiles.clear()
 
@@ -462,7 +651,7 @@ class GestionTirAdversaires:
             tireurs_choisis = random.sample(tireurs_valides, nb_tirs_possibles)
 
             for index_tir in range(nb_tirs_possibles):
-                if self.minuteurs[index_tir].est_termine():
+                if self.minuteurs[index_tir].est_termine:
                     tireur = tireurs_choisis[index_tir]
 
                     self.son.play()

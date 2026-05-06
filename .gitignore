@@ -1,7 +1,12 @@
 .venv/
-.vscode/*
 __pycache__/
 *.pyc
+
+build/
+dist/
+
 sds.cfg
+
+.vscode/*
 !.vscode/launch.json
 !.vscode/settings.json

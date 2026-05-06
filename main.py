@@ -60,6 +60,7 @@ class Jeu:
 
         self.image_fond = self._charger_image_fond()
         self.image_vie = self._charger_image_vie()
+        self.images_intro_adversaires = self._charger_images_intro_adversaires()
 
         self.sons = {
             "projectile_joueur": pygame.mixer.Sound(self.config.son_projectile_joueur),
@@ -68,6 +69,7 @@ class Jeu:
             "explosion_adversaire": pygame.mixer.Sound(self.config.son_explosion_adversaire),
             "adversaire_bonus": pygame.mixer.Sound(self.config.son_adversaire_bonus),
             "victoire": pygame.mixer.Sound(self.config.son_victoire),
+            "vie_bonus": pygame.mixer.Sound(self.config.son_vie_bonus),
         }
         self.sons_bonus: dict[int, pygame.mixer.Sound] = {}
 
@@ -113,6 +115,7 @@ class Jeu:
         self.pointage_cible_bonus = 0
         self.instant_depart_bonus = 0
         self.prochaine_tranche_son_bonus = 0
+        self.derniere_tranche_vie_bonus = 0
         self.animation_bonus_terminee = True
 
         self.derniere_pos_x_projectile_joueur = 0
@@ -233,7 +236,7 @@ class Jeu:
             if self.projectile_joueur is not None and self.projectile_joueur.est_sorti:
                 self.minuteur_perte_projectile.demarrer()
                 self.tirs_perdus += 1
-                self.pointage += self.config.points_projectile_perdu
+                self._modifier_pointage(self.config.points_projectile_perdu)
                 self.derniere_pos_x_projectile_joueur = self.projectile_joueur.rect.centerx
                 self.projectile_joueur = None
 
@@ -283,10 +286,7 @@ class Jeu:
                 self.etat = EtatJeu.VICTOIRE_FINALE
             self._demarrer_bonus_victoire(niveau_termine)
 
-        # Si le pointage courant est supérieur au pointage record
-        if self.pointage > self.pointage_record:
-            self.pointage_record = self.pointage
-            self.couleur_pointage = self.config.couleur_pointage_record
+        self._mettre_a_jour_pointage_record()
                 
     def _mettre_a_jour_effets_visuels(self) -> None:
         """
@@ -335,17 +335,7 @@ class Jeu:
         self.gestion_tir_adversaires.dessiner(self.surface_jeu)
 
         if self.etat is EtatJeu.PREPARATION:
-            rect = self.afficheur_texte.dessiner(
-                self.config.titre,
-                50,
-                40,
-                self.config.taille_police_titre,
-            )
-            self.afficheur_texte.dessiner(
-                "Appuyez ESPACE pour démarrer",
-                50,
-                70,
-            )
+            self._dessiner_ecran_preparation(temps_actuel)
         elif self.etat is EtatJeu.APPROCHE:
             self.animation_approche_adversaires.dessiner(
                 self.surface_jeu,
@@ -438,7 +428,7 @@ class Jeu:
                     (self.config.limite_x_max_zone_jouable, self.config.axe_y_defaite),
                 )
                 pct_y_alerte = round(
-                    (self.config.axe_y_defaite - 30)
+                    (self.config.axe_y_defaite - 10)
                     * 100
                     / self.surface_jeu.get_height()
                 )
@@ -472,6 +462,211 @@ class Jeu:
         for effet in self.effets_visuels:
             effet.dessiner(self.surface_jeu)
 
+    def _dessiner_ecran_preparation(self, temps_actuel: int) -> None:
+        """
+        Affiche l'écran d'introduction avant le début de la partie.
+        """
+
+        marge_x = 110
+        marge_y = 60
+        largeur = self.config.largeur_fenetre - marge_x * 2
+        hauteur = 560
+        rect_panneau = pygame.Rect(marge_x, marge_y, largeur, hauteur)
+
+        voile = pygame.Surface(rect_panneau.size, pygame.SRCALPHA)
+        voile.fill((5, 12, 28, 205))
+        self.surface_jeu.blit(voile, rect_panneau)
+
+        pygame.draw.rect(
+            self.surface_jeu,
+            self.config.couleur_pointage,
+            rect_panneau,
+            width=2,
+            border_radius=8,
+        )
+        pygame.draw.rect(
+            self.surface_jeu,
+            self.config.couleur_bonus,
+            rect_panneau.inflate(-18, -18),
+            width=1,
+            border_radius=6,
+        )
+
+        rect_titre = self.afficheur_texte.dessiner(
+            self.config.titre.upper(),
+            50,
+            14,
+            self.config.taille_police_titre + 10,
+            self.config.couleur_bonus,
+        )
+        self.afficheur_texte.dessiner(
+            f"Mission : survivre aux {len(niveaux.NIVEAUX)} niveaux",
+            50,
+            rect_titre,
+            self.config.taille_police_texte + 6,
+        )
+
+        self._dessiner_visuel_preparation(temps_actuel, rect_panneau)
+
+        x_gauche = rect_panneau.left + 60
+        x_droite = rect_panneau.centerx + 35
+        y_depart = rect_panneau.top + 185
+        interligne = 34
+
+        self._dessiner_titre_section_intro("Objectif", x_gauche, y_depart)
+        self._dessiner_ligne_intro(
+            "Détruire toutes les formations ennemies",
+            x_gauche,
+            y_depart + 38,
+        )
+        self._dessiner_ligne_intro(
+            "Ne pas laisser les adversaires atteindre la ligne d'invasion",
+            x_gauche,
+            y_depart + 38 + interligne,
+        )
+
+        self._dessiner_titre_section_intro("Commandes", x_droite, y_depart)
+        self._dessiner_ligne_intro(
+            "Flèches gauche/droite : déplacer",
+            x_droite,
+            y_depart + 38,
+        )
+        self._dessiner_ligne_intro(
+            "A : tirer un projectile",
+            x_droite,
+            y_depart + 38 + interligne,
+        )
+        self._dessiner_ligne_intro(
+            "Échap : quitter la partie",
+            x_droite,
+            y_depart + 38 + interligne * 2,
+        )
+
+        y_bas = rect_panneau.top + 320
+        self._dessiner_titre_section_intro("Bonus", x_gauche, y_bas)
+        self._dessiner_ligne_intro(
+            "Soucoupe jaune : une visite par niveau pair",
+            x_gauche,
+            y_bas + 38,
+            self.config.couleur_bonus,
+        )
+        self._dessiner_ligne_intro(
+            "Fin de niveau : vies restantes x 250 x précision",
+            x_gauche,
+            y_bas + 38 + interligne,
+            self.config.couleur_bonus,
+        )
+        self._dessiner_ligne_intro(
+            "Multiplicateur selon précision obtenue",
+            x_gauche,
+            y_bas + 38 + interligne * 2,
+            self.config.couleur_bonus,
+        )
+        self._dessiner_ligne_intro(
+            f"Vaisseau supplémentaire à chaque"
+            f" {self.config.tranche_points_vie_supplementaire} points",
+            x_gauche,
+            y_bas + 38 + interligne * 3,
+            self.config.couleur_bonus,
+        )
+
+        y_bas = y_bas + 32
+        self._dessiner_titre_section_intro("Pénalités", x_droite, y_bas)
+        self._dessiner_ligne_intro(
+            "Tir perdu : 100 points en moins et bonus réduit",
+            x_droite,
+            y_bas + 38,
+            self.config.couleur_pointage_negatif,
+        )
+        self._dessiner_ligne_intro(
+            "Impact projectile ennemi : perte de vaisseau",
+            x_droite,
+            y_bas + 38 + interligne,
+            self.config.couleur_pointage_negatif,
+        )
+        self._dessiner_ligne_intro(
+            "Invasion ou perte de tous les vaisseaux : fin de partie",
+            x_droite,
+            y_bas + 38 + interligne * 2,
+            self.config.couleur_pointage_negatif,
+        )
+
+        if self.clignotement_defaut.est_visible(temps_actuel):
+            self.afficheur_texte.dessiner(
+                "Appuyez ESPACE pour lancer le niveau 1",
+                50,
+                74,
+                self.config.taille_police_texte + 6,
+                self.config.couleur_texte,
+            )
+
+    def _dessiner_visuel_preparation(
+        self,
+        temps_actuel: int,
+        rect_panneau: pygame.Rect,
+    ) -> None:
+        """
+        Dessine une petite scène arcade avec les sprites du jeu.
+        """
+
+        marge_interne = 48
+        positions = (
+            (
+                rect_panneau.left + marge_interne,
+                rect_panneau.top + marge_interne,
+            ),
+            (
+                rect_panneau.right - marge_interne,
+                rect_panneau.top + marge_interne,
+            ),
+            (
+                rect_panneau.left + marge_interne,
+                rect_panneau.bottom - marge_interne,
+            ),
+            (
+                rect_panneau.right - marge_interne,
+                rect_panneau.bottom - marge_interne,
+            ),
+        )
+
+        for index, (image, position) in enumerate(
+            zip(self.images_intro_adversaires, positions)
+        ):
+            decalage_y = round(
+                math.sin(temps_actuel * 0.005 + index) * 5
+            )
+            rect_adversaire = image.get_rect(
+                center=(position[0], position[1] + decalage_y)
+            )
+            self.surface_jeu.blit(image, rect_adversaire)
+
+    def _dessiner_titre_section_intro(self, texte: str, x: int, y: int) -> None:
+        """
+        Dessine un titre de section pour l'écran d'introduction.
+        """
+
+        police = pygame.font.Font(None, self.config.taille_police_texte + 12)
+        surface_txt = police.render(texte.upper(), True, self.config.couleur_pointage)
+        self.surface_jeu.blit(surface_txt, (x, y))
+
+    def _dessiner_ligne_intro(
+        self,
+        texte: str,
+        x: int,
+        y: int,
+        couleur: tuple[int, int, int] | None = None,
+    ) -> None:
+        """
+        Dessine une ligne d'information avec une puce lumineuse.
+        """
+
+        couleur_texte = couleur if couleur is not None else self.config.couleur_texte
+        pygame.draw.circle(self.surface_jeu, couleur_texte, (x + 8, y + 10), 4)
+
+        police = pygame.font.Font(None, self.config.taille_police_texte + 2)
+        surface_txt = police.render(texte, True, couleur_texte)
+        self.surface_jeu.blit(surface_txt, (x + 24, y))
+
     def _charger_image_fond(self) -> pygame.Surface:
         """
         Charge l'image de fond et l'adapte à la surface logique du jeu.
@@ -491,6 +686,19 @@ class Jeu:
         image_vie = pygame.image.load(self.config.image_joueur).convert_alpha()
         return pygame.transform.smoothscale(image_vie, (32, 32))
 
+    def _charger_images_intro_adversaires(self) -> list[pygame.Surface]:
+        """
+        Charge les sprites d'adversaires utilisés par l'écran de préparation.
+        """
+
+        return [
+            pygame.transform.smoothscale(
+                pygame.image.load(chemin_image).convert_alpha(),
+                (self.config.largeur_adversaire, self.config.hauteur_adversaire),
+            )
+            for chemin_image in self.config.image_adversaires
+        ]
+
     def _demarrer_nouvelle_partie(self) -> None:
         """
         Démarre une nouvelle partie
@@ -498,6 +706,7 @@ class Jeu:
 
         self.nombre_vies = self.config.nb_vies_initiales
         self.pointage = 0
+        self.derniere_tranche_vie_bonus = 0
         self.couleur_pointage = self.config.couleur_pointage
         self.gestionnaire_niveaux.recommencer()
 
@@ -597,7 +806,7 @@ class Jeu:
         self.animation_bonus_terminee = self.bonus_victoire <= 0
 
         if self.animation_bonus_terminee:
-            self.pointage = self.pointage_cible_bonus
+            self._definir_pointage(self.pointage_cible_bonus)
 
     def _mettre_a_jour_bonus_victoire(self) -> None:
         """
@@ -616,7 +825,7 @@ class Jeu:
             nb_tranches_affichees * self.config.tranche_son_bonus,
             self.bonus_victoire,
         )
-        self.pointage = self.pointage_depart_bonus + points_bonus_affiches
+        self._definir_pointage(self.pointage_depart_bonus + points_bonus_affiches)
 
         while self.prochaine_tranche_son_bonus <= points_bonus_affiches:
             index_son = (
@@ -627,12 +836,8 @@ class Jeu:
             self.prochaine_tranche_son_bonus += self.config.tranche_son_bonus
 
         if points_bonus_affiches >= self.bonus_victoire:
-            self.pointage = self.pointage_cible_bonus
+            self._definir_pointage(self.pointage_cible_bonus)
             self.animation_bonus_terminee = True
-
-        if self.pointage > self.pointage_record:
-            self.pointage_record = self.pointage
-            self.couleur_pointage = self.config.couleur_pointage_record
 
     def _terminer_animation_bonus_si_necessaire(self) -> bool:
         """
@@ -644,14 +849,58 @@ class Jeu:
         if self.animation_bonus_terminee:
             return False
 
-        self.pointage = self.pointage_cible_bonus
+        self._definir_pointage(self.pointage_cible_bonus)
         self.animation_bonus_terminee = True
+
+        return True
+
+    def _modifier_pointage(self, points: int) -> None:
+        """
+        Modifie le pointage et applique les effets associés au nouveau total.
+        """
+
+        self._definir_pointage(self.pointage + points)
+
+    def _definir_pointage(self, nouveau_pointage: int) -> None:
+        """
+        Définit le pointage et vérifie les vies bonus et le record.
+        """
+
+        self.pointage = nouveau_pointage
+        self._attribuer_vies_bonus_si_necessaire()
+        self._mettre_a_jour_pointage_record()
+
+    def _attribuer_vies_bonus_si_necessaire(self) -> None:
+        """
+        Donne une vie supplémentaire pour chaque nouvelle tranche de points atteinte.
+        """
+
+        tranche_points = self.config.tranche_points_vie_supplementaire
+
+        if tranche_points <= 0:
+            return
+
+        tranche_atteinte = max(0, self.pointage // tranche_points)
+
+        if tranche_atteinte <= self.derniere_tranche_vie_bonus:
+            return
+
+        nb_vies_bonus = tranche_atteinte - self.derniere_tranche_vie_bonus
+
+        for _ in range(nb_vies_bonus):
+            self.nombre_vies += 1
+            self.sons["vie_bonus"].play()
+
+        self.derniere_tranche_vie_bonus = tranche_atteinte
+
+    def _mettre_a_jour_pointage_record(self) -> None:
+        """
+        Met à jour le record si le pointage courant le dépasse.
+        """
 
         if self.pointage > self.pointage_record:
             self.pointage_record = self.pointage
             self.couleur_pointage = self.config.couleur_pointage_record
-
-        return True
 
     def _dessiner_bonus_victoire(self) -> pygame.Rect:
         """
@@ -819,7 +1068,7 @@ class Jeu:
                 self.sons["explosion_adversaire"].play()
                 self.formation_adversaires.adversaires.remove(adv)
                 self.projectile_joueur = None
-                self.pointage += adv.ValeurPointage
+                self._modifier_pointage(adv.ValeurPointage)
 
     def _gerer_collisions_adversaire_bonus(self) -> None:
         """
@@ -837,7 +1086,7 @@ class Jeu:
                     )
                     self.sons["explosion_adversaire"].play()
                     self.projectile_joueur = None
-                    self.pointage += points
+                    self._modifier_pointage(points)
 
 
     def _charger_fichier_config(self) -> ConfigParser:

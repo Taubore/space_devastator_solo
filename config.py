@@ -54,6 +54,7 @@ class Configuration:
     frequence_son_bonus_depart: int = 500
     increment_frequence_son_bonus: int = 25
     duree_son_bonus_ms: int = 30
+    tranche_points_vie_supplementaire: int = 25000
 
     # Sons
     son_projectile_joueur: str = "assets/sons/projectile_joueur.wav"
@@ -62,6 +63,7 @@ class Configuration:
     son_explosion_adversaire: str = "assets/sons/explosion_adversaire.wav"
     son_adversaire_bonus: str = "assets/sons/adversaire_bonus.wav"
     son_victoire: str = "assets/sons/victoire.mp3"
+    son_vie_bonus: str = "assets/sons/vie_bonus.mp3"
 
     # Joueur
     couleur_joueur: tuple[int, int, int] = (80, 220, 255)  # À retirer lorsque sprite
@@ -70,7 +72,7 @@ class Configuration:
     hauteur_joueur: int = 96
     vitesse_joueur: int = 7
 
-    axe_y_defaite: int = limite_y_max_zone_jouable - hauteur_joueur - 25
+    axe_y_defaite: int = limite_y_max_zone_jouable - hauteur_joueur - 5
     axe_y_avertissement : int = axe_y_defaite - 100
 
     # Adversaires

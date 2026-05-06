@@ -44,7 +44,7 @@
 - Noms Python en français sans accents.
 - Commentaires, docstrings et textes utilisateur en français normal avec accents.
 - Conserver en anglais les éléments imposés par Python et Pygame.
-- Limiter les lignes à 88 caractères. 
+- Limiter les lignes à 100 caractères. 
 - Code bien aéré et suffisament documenté en respectant les bonne pratiques de développement communautaire (GitHub).
 
 ## Objectif actuel

@@ -11,7 +11,8 @@ Version en cours de développement.
 Fonctionnalités présentes :
 
 - boucle principale avec états de jeu ;
-- écran de préparation, victoire et défaite ;
+- écran de préparation avec règles, bonus, pénalités et contrôles ;
+- écrans de victoire et de défaite ;
 - déplacement horizontal du joueur ;
 - tir du joueur avec un seul projectile actif ;
 - formation d'adversaires mobile ;
@@ -69,11 +70,27 @@ répertoire courant afin d'éviter les erreurs de chargement des assets.
 - `Espace` : démarrer, continuer ou relancer selon l'état du jeu
 - `Échap` : quitter
 
+## Règles générales
+
+Le joueur doit éliminer toute la formation ennemie pour passer au niveau
+suivant. La partie contient `10` niveaux, avec une difficulté progressive sur
+la taille des formations, leur vitesse et le nombre de canaux de tir ennemis.
+
+Une soucoupe bonus jaune peut apparaître dans certains niveaux. Elle rapporte
+un gros pointage si elle est détruite avant de quitter l'écran. Les tirs perdus
+retirent des points et réduisent le multiplicateur de précision appliqué au
+bonus de fin de niveau.
+
 ## Pointage
 
 Les adversaires rapportent des points selon leur type. Un projectile du joueur
 qui sort de l'écran sans toucher d'adversaire retire `100` points si le pointage
 est positif.
+
+Une vie supplémentaire est accordée une seule fois pour chaque tranche de
+`25 000` points atteinte. Si le pointage redescend sous une tranche déjà
+atteinte, puis la franchit de nouveau, aucune nouvelle vie bonus n'est donnée
+pour cette même tranche. Un son dédié est joué pour chaque vie bonus obtenue.
 
 Après une victoire de niveau ou une victoire finale, un bonus est ajouté au
 pointage :

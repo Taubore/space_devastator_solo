@@ -77,12 +77,24 @@ jobs:
         with:
           path: artifacts
 
-      - name: Publier la release
+      - name: Vérifier les fichiers téléchargés
+        run: |
+          find artifacts -type f -maxdepth 3
+
+      - name: Créer ou mettre à jour la release
         env:
           GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
         run: |
-          gh release create "${{ github.ref_name }}" \
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            echo "La release $TAG existe déjà. Les fichiers seront remplacés."
+          else
+            gh release create "$TAG" \
+              --title "Space Devastator Solo $TAG" \
+              --notes "Version exécutable de Space Devastator Solo."
+          fi
+
+          gh release upload "$TAG" \
             artifacts/linux/space-devastator-solo-linux.tar.gz \
             artifacts/windows/space-devastator-solo-windows.zip \
-            --title "Space Devastator Solo ${{ github.ref_name }}" \
-            --notes "Version exécutable de Space Devastator Solo."
+            --clobber

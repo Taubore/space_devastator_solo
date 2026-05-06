@@ -1,0 +1,88 @@
+name: Construire et publier la release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write
+
+jobs:
+  construire:
+    name: Construire ${{ matrix.nom }}
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - nom: linux
+            os: ubuntu-latest
+            archive: space-devastator-solo-linux.tar.gz
+
+          - nom: windows
+            os: windows-latest
+            archive: space-devastator-solo-windows.zip
+
+    steps:
+      - name: Récupérer le dépôt
+        uses: actions/checkout@v6
+
+      - name: Installer Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: |
+            requirements.txt
+            requirements-dev.txt
+
+      - name: Installer les dépendances de construction
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements-dev.txt
+
+      - name: Construire l'exécutable avec PyInstaller
+        run: pyinstaller --noconfirm --clean space_devastator_solo.spec
+
+      - name: Créer l'archive Linux
+        if: runner.os == 'Linux'
+        run: |
+          cd dist
+          tar -czf ../${{ matrix.archive }} space_devastator_solo
+
+      - name: Créer l'archive Windows
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Compress-Archive `
+            -Path dist/space_devastator_solo `
+            -DestinationPath ${{ matrix.archive }}
+
+      - name: Conserver l'archive
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ matrix.nom }}
+          path: ${{ matrix.archive }}
+
+  publier:
+    name: Publier la release GitHub
+    needs: construire
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Récupérer les archives
+        uses: actions/download-artifact@v8
+        with:
+          path: artifacts
+
+      - name: Publier la release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ github.ref_name }}" \
+            artifacts/linux/space-devastator-solo-linux.tar.gz \
+            artifacts/windows/space-devastator-solo-windows.zip \
+            --title "Space Devastator Solo ${{ github.ref_name }}" \
+            --notes "Version exécutable de Space Devastator Solo."

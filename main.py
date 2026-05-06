@@ -11,9 +11,9 @@ import niveaux
 
 from array import array
 from configparser import ConfigParser
-from pathlib import Path
 
 from config import Configuration
+from chemins import chemin_ancien_config_projet, chemin_config_utilisateur, chemin_ressource
 from etats import EtatJeu, DirectionHorizontale
 from commun import Minuteur, Clignotement, AfficheurTexte
 from effets import EffetVisuel, Explosion, FlashTir
@@ -42,7 +42,7 @@ class Jeu:
 
         # Configuration initiale du jeu
         self.config = Configuration()
-        self.rep_config = Path("sds.cfg")
+        self.rep_config = chemin_config_utilisateur()
         self.fichier_config = self._charger_fichier_config()
         self.pointage_record = self.fichier_config.getint("pointage", "record", fallback=0)
 
@@ -63,13 +63,27 @@ class Jeu:
         self.images_intro_adversaires = self._charger_images_intro_adversaires()
 
         self.sons = {
-            "projectile_joueur": pygame.mixer.Sound(self.config.son_projectile_joueur),
-            "projectile_adversaire": pygame.mixer.Sound(self.config.son_projectile_adversaire),
-            "explosion_joueur": pygame.mixer.Sound(self.config.son_explosion_joueur),
-            "explosion_adversaire": pygame.mixer.Sound(self.config.son_explosion_adversaire),
-            "adversaire_bonus": pygame.mixer.Sound(self.config.son_adversaire_bonus),
-            "victoire": pygame.mixer.Sound(self.config.son_victoire),
-            "vie_bonus": pygame.mixer.Sound(self.config.son_vie_bonus),
+            "projectile_joueur": pygame.mixer.Sound(
+                chemin_ressource(self.config.son_projectile_joueur)
+            ),
+            "projectile_adversaire": pygame.mixer.Sound(
+                chemin_ressource(self.config.son_projectile_adversaire)
+            ),
+            "explosion_joueur": pygame.mixer.Sound(
+                chemin_ressource(self.config.son_explosion_joueur)
+            ),
+            "explosion_adversaire": pygame.mixer.Sound(
+                chemin_ressource(self.config.son_explosion_adversaire)
+            ),
+            "adversaire_bonus": pygame.mixer.Sound(
+                chemin_ressource(self.config.son_adversaire_bonus)
+            ),
+            "victoire": pygame.mixer.Sound(
+                chemin_ressource(self.config.son_victoire)
+            ),
+            "vie_bonus": pygame.mixer.Sound(
+                chemin_ressource(self.config.son_vie_bonus)
+            ),
         }
         self.sons_bonus: dict[int, pygame.mixer.Sound] = {}
 
@@ -672,7 +686,9 @@ class Jeu:
         Charge l'image de fond et l'adapte à la surface logique du jeu.
         """
 
-        image_fond = pygame.image.load(self.config.image_fond_ecran).convert()
+        image_fond = pygame.image.load(
+            chemin_ressource(self.config.image_fond_ecran)
+        ).convert()
         return pygame.transform.smoothscale(
             image_fond,
             (self.config.largeur_fenetre, self.config.hauteur_fenetre),
@@ -683,7 +699,9 @@ class Jeu:
         Charge l'icône du joueur affichée à côté du nombre de vies.
         """
 
-        image_vie = pygame.image.load(self.config.image_joueur).convert_alpha()
+        image_vie = pygame.image.load(
+            chemin_ressource(self.config.image_joueur)
+        ).convert_alpha()
         return pygame.transform.smoothscale(image_vie, (32, 32))
 
     def _charger_images_intro_adversaires(self) -> list[pygame.Surface]:
@@ -693,7 +711,9 @@ class Jeu:
 
         return [
             pygame.transform.smoothscale(
-                pygame.image.load(chemin_image).convert_alpha(),
+                pygame.image.load(
+                    chemin_ressource(chemin_image)
+                ).convert_alpha(),
                 (self.config.largeur_adversaire, self.config.hauteur_adversaire),
             )
             for chemin_image in self.config.image_adversaires
@@ -1095,7 +1115,12 @@ class Jeu:
         """
 
         config_sds = ConfigParser()
-        config_sds.read(self.rep_config, encoding="utf-8")
+        ancien_config = chemin_ancien_config_projet()
+
+        if self.rep_config.exists():
+            config_sds.read(self.rep_config, encoding="utf-8")
+        elif ancien_config.exists() and ancien_config != self.rep_config:
+            config_sds.read(ancien_config, encoding="utf-8")
 
         if not config_sds.has_section("pointage"):
             config_sds["pointage"] = {}
@@ -1109,6 +1134,8 @@ class Jeu:
         """
         Enregistre la configuration sauvegardée du jeu.
         """
+
+        self.rep_config.parent.mkdir(parents=True, exist_ok=True)
 
         with self.rep_config.open("w", encoding="utf-8") as fichier:
             self.fichier_config.write(fichier)

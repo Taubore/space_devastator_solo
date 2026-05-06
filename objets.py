@@ -5,6 +5,7 @@ import math
 import pygame
 
 from config import Configuration
+from chemins import chemin_ressource
 from etats import DirectionHorizontale
 from commun import Minuteur
 
@@ -34,7 +35,9 @@ class Joueur:
             config.hauteur_joueur,
         )
 
-        self.image = pygame.image.load(self.config.image_joueur).convert_alpha()
+        self.image = pygame.image.load(
+            chemin_ressource(self.config.image_joueur)
+        ).convert_alpha()
         self.image = pygame.transform.smoothscale(
             self.image,
             (self.config.largeur_joueur, self.config.hauteur_joueur),
@@ -137,7 +140,9 @@ class Adversaire:
             config.hauteur_adversaire,
         )
 
-        self.image = pygame.image.load(config.image_adversaires[niveau]).convert_alpha()
+        self.image = pygame.image.load(
+            chemin_ressource(config.image_adversaires[niveau])
+        ).convert_alpha()
         self.image = pygame.transform.smoothscale(
             self.image,
             (config.largeur_adversaire, config.hauteur_adversaire),
@@ -324,7 +329,9 @@ class AdversaireBonus:
         else:
             self.rect.right = config.limite_x_max_zone_jouable
 
-        self.image = pygame.image.load(config.image_adversaire_bonus).convert_alpha()
+        self.image = pygame.image.load(
+            chemin_ressource(config.image_adversaire_bonus)
+        ).convert_alpha()
         self.image = pygame.transform.smoothscale(
             self.image,
             (config.largeur_adversaire, config.hauteur_adversaire),
